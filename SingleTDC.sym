@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<symbol version="7" name="SingleTDC">
+    <symboltype>BLOCK</symboltype>
+    <timestamp>2010-2-2T10:33:57</timestamp>
+    <pin polarity="Output" x="448" y="-288" name="BigData(15:0)" />
+    <pin polarity="Output" x="448" y="-224" name="BigDataLater(15:0)" />
+    <pin polarity="Input" x="0" y="-96" name="Clear" />
+    <pin polarity="Input" x="0" y="-288" name="Clock" />
+    <pin polarity="Input" x="0" y="-224" name="Enable" />
+    <pin polarity="Output" x="448" y="-160" name="FineDataA(31:0)" />
+    <pin polarity="Output" x="448" y="-96" name="FineDataB(31:0)" />
+    <pin polarity="Output" x="448" y="-32" name="HitPresent" />
+    <pin polarity="Input" x="0" y="-160" name="Save" />
+    <graph>
+        <rect width="320" x="64" y="-320" height="320" />
+        <attrtext style="alignment:BCENTER;fontsize:56;fontname:Arial" attrname="SymbolName" x="224" y="-328" type="symbol" />
+        <line x2="448" y1="-288" y2="-288" x1="384" />
+        <attrtext style="alignment:RIGHT;fontsize:24;fontname:Arial" attrname="PinName" x="376" y="-288" type="pin BigData(15:0)" />
+        <rect width="64" x="384" y="-300" height="24" />
+        <line x2="448" y1="-224" y2="-224" x1="384" />
+        <attrtext style="alignment:RIGHT;fontsize:24;fontname:Arial" attrname="PinName" x="376" y="-224" type="pin BigDataLater(15:0)" />
+        <rect width="64" x="384" y="-236" height="24" />
+        <line x2="0" y1="-96" y2="-96" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-96" type="pin Clear" />
+        <line x2="0" y1="-288" y2="-288" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-288" type="pin Clock" />
+        <line x2="0" y1="-224" y2="-224" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-224" type="pin Enable" />
+        <line x2="448" y1="-160" y2="-160" x1="384" />
+        <attrtext style="alignment:RIGHT;fontsize:24;fontname:Arial" attrname="PinName" x="376" y="-160" type="pin FineDataA(31:0)" />
+        <rect width="64" x="384" y="-172" height="24" />
+        <line x2="448" y1="-96" y2="-96" x1="384" />
+        <attrtext style="alignment:RIGHT;fontsize:24;fontname:Arial" attrname="PinName" x="376" y="-96" type="pin FineDataB(31:0)" />
+        <rect width="64" x="384" y="-108" height="24" />
+        <line x2="448" y1="-32" y2="-32" x1="384" />
+        <attrtext style="alignment:RIGHT;fontsize:24;fontname:Arial" attrname="PinName" x="376" y="-32" type="pin HitPresent" />
+        <line x2="0" y1="-160" y2="-160" x1="64" />
+        <attrtext style="fontsize:24;fontname:Arial" attrname="PinName" x="72" y="-160" type="pin Save" />
+    </graph>
+</symbol>
