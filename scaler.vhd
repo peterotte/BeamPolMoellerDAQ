@@ -11,7 +11,8 @@ entity scaler is
 		port (
 			CLKL : in STD_LOGIC;
 			CLKH : in STD_LOGIC;
-			scal_in : STD_LOGIC_VECTOR ( (NCh-1) downto 0);				
+			scal_in : in STD_LOGIC_VECTOR ( (NCh-1) downto 0);	
+			ScalerGate : in Std_logic;
 			--............ vme interface ....................
 			u_ad_reg :in std_logic_vector(11 downto 2);
 			u_dat_in :in std_logic_vector(31 downto 0);
@@ -27,7 +28,9 @@ architecture RTL of scaler is
 	signal count_fix : std_logic_vector (NCh*NBit-1 downto 0);
 	signal sc_clr : std_logic;
 	signal sc_fix : std_logic;
-
+	signal sc_ConstantGate : std_logic := '0';
+	signal EffectiveGate : std_logic;
+	
 	constant BASE_SCAL_REG : std_logic_vector(11 downto 2) := b"0000000000"; -- 0x000 - 0x1FF r
 
 	constant BASE_SCAL_CLR : std_logic_vector(11 downto 2) := b"1000000000"; -- 0x800 w
@@ -36,15 +39,14 @@ architecture RTL of scaler is
 	constant BASE_SCAL_FIX : std_logic_vector(11 downto 2) := b"1111000000"; -- 0xF00 r
 	constant BASE_SCAL_NCH : std_logic_vector(11 downto 2) := b"1111000001"; -- 0xF04 r
 	constant BASE_SCAL_NBIT :std_logic_vector(11 downto 2) := b"1111000010"; -- 0xF08 r
-
-
-
+	constant BASE_SCAL_ConstantGate : std_logic_vector(11 downto 2) := b"1111000011"; -- 0xF0c r/w whether the gate is const = '1' or depending on Input 31 if INOUT3
 
 
 ------------------------------------------------------------------------------------------
 begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN 
 ------------------------------------------------------------------------------------------
-	
+	EffectiveGate <= '1' when (sc_ConstantGate = '1') else ScalerGate;
+
 	process (CLKH)
 	begin
 		if (CLKH'event and CLKH ='1') then
@@ -60,7 +62,7 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN 
 			for i in 0 to (NCh-1) loop
 				if(sc_clr='1') then
 					count(NBit*(i+1)-1 downto NBit*i)<=(others => '0');
-				elsif(in_f1(i)='1' and in_f2(i)='0') then
+				elsif(in_f1(i)='1' and in_f2(i)='0' and EffectiveGate = '1') then
 					count(NBit*(i+1)-1 downto NBit*i)<=count(NBit*(i+1)-1 downto NBit*i)+1;
 				end if;
 			end loop;
@@ -87,18 +89,20 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN 
 --					vme_ovf <= TDCOVF;
 --				end if;
 
-				if (ckcsr='1' and 
-					u_ad_reg(11 downto 2)= BASE_SCAL_CLR  ) then -- 0x800
+				if (ckcsr='1' and u_ad_reg(11 downto 2)= BASE_SCAL_CLR  ) then -- 0x800
 					sc_clr <= u_dat_in(0);
 				else sc_clr <='0';
 				end if;
 
-				if (ckcsr='1' and 
-					u_ad_reg(11 downto 2)= BASE_SCAL_STOP  ) then -- 0x804 
+				if (ckcsr='1' and u_ad_reg(11 downto 2)= BASE_SCAL_STOP  ) then -- 0x804 
 					sc_fix <= u_dat_in(0);
 				else sc_fix <='0';
 				end if;
-
+				
+				if (ckcsr='1' and u_ad_reg(11 downto 2)= BASE_SCAL_ConstantGate  ) then -- 0x804 
+					sc_ConstantGate <= u_dat_in(0);
+				end if;
+				
 			end if;
 
 		end process;
@@ -112,7 +116,8 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN 
 			for I in 0 to NCh-1 loop -- 0x000 ->0x1fc
 				if ( u_ad_reg(11 downto 10)=BASE_SCAL_REG(11 downto 10) ) then
 					if ( u_ad_reg(9 downto 2)=CONV_STD_LOGIC_VECTOR( I, 8) ) then 
-						u_data_o(31 downto NBit) <= (others => '0'); --in case NBit is smaler than 31, otherwise commment this out
+-- uncomment if NBit < 31:
+--						u_data_o(31 downto NBit) <= (others => '0'); --in case NBit is smaler than 31, otherwise commment this out
 						u_data_o(NBit-1 downto 0) <= count_fix( NBit*(I+1)-1 downto NBit*I );
 
 --						u_data_o(31 downto 24) <= CONV_STD_LOGIC_VECTOR(I,8);
@@ -123,22 +128,23 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN 
 				end if;
 			end loop;
 			-- STATUS -- 0x400 
-			if ( 
-				u_ad_reg(11 downto 2)= BASE_SCAL_NCH  ) then -- 
+			if ( u_ad_reg(11 downto 2)= BASE_SCAL_NCH  ) then
 					u_data_o(7 downto 0) <= CONV_STD_LOGIC_VECTOR(NCh, 8);
 					u_data_o(31 downto 8) <= x"000000";
 			end if;			
-			if ( 
-				u_ad_reg(11 downto 2)= BASE_SCAL_NBIT  ) then -- 
+			if ( u_ad_reg(11 downto 2)= BASE_SCAL_NBIT  ) then
 					u_data_o(31 downto 0) <= CONV_STD_LOGIC_VECTOR(NBit,32);
 			end if;	
 
-				if (  
-					u_ad_reg(11 downto 2)= BASE_SCAL_FIX ) then -- 
-						u_data_o(31 downto 0) <= x"87654321";
-				end if;	
+			if ( u_ad_reg(11 downto 2)= BASE_SCAL_FIX ) then
+					u_data_o(31 downto 0) <= x"87654321";
+			end if;	
 		
-		
+			if ( u_ad_reg(11 downto 2)= BASE_SCAL_ConstantGate ) then
+					u_data_o(0) <= sc_ConstantGate;
+					u_data_o(31 downto 1) <= (others => '0');
+			end if;	
+			
 
 			end if;
 		end process;

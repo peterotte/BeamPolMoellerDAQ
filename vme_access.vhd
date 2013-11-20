@@ -1,32 +1,18 @@
 
 ----------------------------------------------------------------------------------
 -- Company:     GSI
--- Engineer:    S.Minami
+-- Engineer:    S.Minami and Peter-Bernd Otte
 -- 
 -- Create Date:    10:47:22 06/03/2008 
 -- Design Name: vme_access.vhd
--- Module Name:    vme_access - Behavioral 
--- Project Name:  vuprom_tdc_v2
--- Target Devices: VUPROM2
--- Tool versions: ISE 9.2
+-- Last Update:    22.8.2012
 -- Description:  a module for vme access control
---
--- Dependencies: 
---
--- Revision: 
--- Revision 0.01 - File Created
--- Additional Comments: 
 --
 ----------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
-
----- Uncomment the following library declaration if instantiating
----- any Xilinx primitives in this code.
---library UNISIM;
---use UNISIM.VComponents.all;
 
 entity vme_access is
   generic (
@@ -35,7 +21,6 @@ entity vme_access is
     );
     
   Port ( AD : inout  STD_LOGIC_VECTOR (31 downto 0);
-		vmeaccess_out : out STD_LOGIC_VECTOR (31 downto 0);	
 		VME_Reset : in std_logic;
            ASI : in  STD_LOGIC;
            WRI : in  STD_LOGIC;
@@ -43,9 +28,8 @@ entity vme_access is
            DS1I : in  STD_LOGIC;
            CON : inout  STD_LOGIC_VECTOR (15 downto 0);
 			  VN2andVN1 : out std_logic_vector(7 downto 0);
-           DB : out  STD_LOGIC_VECTOR (7 downto 0);
 			  CKADDR : out STD_LOGIC;
-			  WS : out STD_LOGIC; -- Anselm: write signal?
+			  WS : out STD_LOGIC;
            CKCSR : out  STD_LOGIC;
            OECSR : out  STD_LOGIC;
 			  U_AD_REG : out STD_LOGIC_VECTOR ( 31 downto 2);
@@ -68,20 +52,21 @@ signal ad_reg		: std_logic_vector (31 downto 0);	 -- internal address register f
 
 --type vme_adr_typ is (va00,va01,va02,va03,va04,va05,va0b, vaRecovery);	-- va06,va07,va08,va09,va0a,
 --signal vme_adr, vme_anx : vme_adr_typ;
-	subtype vme_adr_typ is std_logic_vector(2 downto 0);
-	constant va00 : vme_adr_typ 			:= "000";
-	constant va01 : vme_adr_typ 			:= "001";
-	constant va02 : vme_adr_typ 			:= "011";
-	constant va03 : vme_adr_typ 			:= "010";
-	constant va04 : vme_adr_typ 			:= "110";
-	constant va05 : vme_adr_typ 			:= "111";
-	constant va0b : vme_adr_typ 			:= "101";
-	constant vaRecovery : vme_adr_typ 	:= "100";
+	subtype vme_adr_typ is std_logic_vector(3 downto 0);
+	constant va00 : vme_adr_typ 			:= "0000";
+	constant va01 : vme_adr_typ 			:= "0001";
+	constant va02 : vme_adr_typ 			:= "0011";
+	constant va03 : vme_adr_typ 			:= "0010";
+	constant va03a : vme_adr_typ 			:= "0110";
+	constant va04 : vme_adr_typ 			:= "0111";
+	constant va05 : vme_adr_typ 			:= "0101";
+	constant va0b : vme_adr_typ 			:= "0100";
+	constant vaRecovery : vme_adr_typ 	:= "1100";
 	signal vme_adr, vme_adr_Next : vme_adr_typ;
 
 	--Always use gray code for FSM!! http://en.wikipedia.org/wiki/Gray_code
 	attribute safe_recovery_state: string;
-	attribute safe_recovery_state of vme_adr: signal is "100"; -- always use some separate Recovery State
+	attribute safe_recovery_state of vme_adr: signal is "1100"; -- always use some separate Recovery State
 	attribute safe_implementation: string;
 	attribute safe_implementation of vme_adr: signal is "yes";
 	attribute fsm_encoding: string;
@@ -89,33 +74,39 @@ signal ad_reg		: std_logic_vector (31 downto 0);	 -- internal address register f
 	attribute fsm_extract: string;
 	attribute fsm_extract of vme_adr: signal is "yes";
 	attribute register_powerup : string;
-	attribute register_powerup of vme_adr : signal is "000"; -- if the FSm has no reset option, then thhis attribute has to be set. Otherwise it wont be recognised as a FSM.
+	attribute register_powerup of vme_adr : signal is "0000"; -- if the FSm has no reset option, then thhis attribute has to be set. Otherwise it wont be recognised as a FSM.
 
 
 
 	--type vmdacs_typ is (vc00,vc01,vc02,vc03,vc04,vc05,vc06,vc08,vc09,vc0a,vc0b,vc0c,vc0d,vc0e);
-	subtype vmdacs_typ is std_logic_vector(3 downto 0);
-	constant vc00 : vmdacs_typ 			:= "0000";
-	constant vc01 : vmdacs_typ 			:= "0001";
-	constant vc02 : vmdacs_typ 			:= "0011";
-	constant vc03 : vmdacs_typ 			:= "0010";
-	constant vc04 : vmdacs_typ 			:= "0110";
-	constant vc05 : vmdacs_typ 			:= "0111";
-	constant vc06 : vmdacs_typ 			:= "0101";
-	constant vc08 : vmdacs_typ 			:= "0100";
-	constant vc09 : vmdacs_typ 			:= "1100";
-	constant vc0a : vmdacs_typ 			:= "1101";
-	constant vc0b : vmdacs_typ 			:= "1111";
-	constant vc0c : vmdacs_typ 			:= "1110";
-	constant vc0d : vmdacs_typ 			:= "1010";
-	constant vc0e : vmdacs_typ 			:= "1011";
-	constant vcRecovery : vmdacs_typ 	:= "1001";
+	subtype vmdacs_typ is std_logic_vector(4 downto 0);
+	constant vc00 : vmdacs_typ 			:= "00000";
+	constant vc01 : vmdacs_typ 			:= "00001";
+	constant vc02 : vmdacs_typ 			:= "00011";
+	constant vc03 : vmdacs_typ 			:= "00010";
+	constant vc04a : vmdacs_typ 			:= "00110";
+	constant vc04aa : vmdacs_typ 			:= "00111";
+	constant vc04b : vmdacs_typ 			:= "00101";
+	constant vc04c: vmdacs_typ 			:= "00100";
+	constant vc05 : vmdacs_typ 			:= "01100";
+	constant vc06 : vmdacs_typ 			:= "01101";
+	constant vc08 : vmdacs_typ 			:= "01111";
+	constant vc09 : vmdacs_typ 			:= "01110";
+	constant vc0a : vmdacs_typ 			:= "01010";
+	constant vc0b : vmdacs_typ 			:= "01011";
+	constant vc0c : vmdacs_typ 			:= "01001";
+	constant vc0ca : vmdacs_typ 			:= "01000";
+	constant vc0caa : vmdacs_typ 			:= "11000";
+	constant vc0caaa : vmdacs_typ 		:= "11001";
+	constant vc0d : vmdacs_typ 			:= "11011";
+	constant vc0e : vmdacs_typ 			:= "11010";
+	constant vcRecovery : vmdacs_typ 	:= "11111";
 	signal vmdacs, vmdacs_nx : vmdacs_typ;
-	attribute safe_recovery_state of vmdacs: signal is "1001";--"1001"; -- always use some separate Recovery State
+	attribute safe_recovery_state of vmdacs: signal is "11111";--"11111"; -- always use some separate Recovery State
 	attribute safe_implementation of vmdacs: signal is "yes";
 	attribute fsm_encoding of vmdacs: signal is "user"; -- "{auto | one-hot | compact | sequential | gray | johnson | speed1 | user}";
 	attribute fsm_extract of vmdacs: signal is "yes";
-	attribute register_powerup of vmdacs : signal is "0000"; -- if the FSm has no reset option, then thhis attribute has to be set. Otherwise it wont be recognised as a FSM.
+	attribute register_powerup of vmdacs : signal is "00000"; -- if the FSM has no reset option, then this attribute has to be set. Otherwise it won't be recognised as a FSM.
 
 
 	signal st_csr_drd		: std_logic;	 -- start state machine for CSR read
@@ -124,7 +115,6 @@ signal ad_reg		: std_logic_vector (31 downto 0);	 -- internal address register f
 
 	signal int_res		: std_logic_vector (23 downto 20);	 -- internal address register for VME address
 	signal sel_rnd		: std_logic;	 -- FLASH, CSR, HPI, DPRAM random access
-	signal sel_bt32	: std_logic;	 -- DPRAM BT 32 access
 
 	signal ckad		: std_logic;				-- clock for internal address register
 	signal stda		: std_logic;				-- start data phase	state machine
@@ -133,34 +123,10 @@ signal ad_reg		: std_logic_vector (31 downto 0);	 -- internal address register f
 	signal regsel	:std_logic;
 	signal csr_o	: std_logic_vector (1 downto 0);  	-- vme data phase outputs for csr 
 	signal vdcsr	: std_logic_vector (3 downto 0);  	-- vme data phase outputs for external vme buffer register 
-	signal aph_sta, dph_sta	: std_logic_vector (3 downto 0);  	-- states of aph machine
 	signal enable		: std_logic;				-- enable internal data bus to outside of fpga
 	signal ack_csr		: std_logic;				-- internal acknowledge csr
 
 begin
-	vmeaccess_out(0) <= '1' when vme_adr = va00 else '0';
-	vmeaccess_out(1) <= '1' when vme_adr = va01 else '0';
-	vmeaccess_out(2) <= '1' when vme_adr = va02 else '0';
-	vmeaccess_out(3) <= '1' when vme_adr = va03 else '0';
-	vmeaccess_out(4) <= '1' when vme_adr = va04 else '0';
-	vmeaccess_out(5) <= '1' when vme_adr = va05 else '0';
-	vmeaccess_out(6) <= '1' when vme_adr = va0b else '0';
-	
-	vmeaccess_out(7) <= '1' when vmdacs = vc00 else '0';
-	vmeaccess_out(8) <= '1' when vmdacs = vc01 else '0';
-	vmeaccess_out(9) <= '1' when vmdacs = vc02 else '0';
-	vmeaccess_out(10) <= '1' when vmdacs = vc03 else '0';
-	vmeaccess_out(11) <= '1' when vmdacs = vc04 else '0';
-	vmeaccess_out(12) <= '1' when vmdacs = vc05 else '0';
-	vmeaccess_out(13) <= '1' when vmdacs = vc06 else '0';
-	vmeaccess_out(14) <= '1' when vmdacs = vc08 else '0';
-	vmeaccess_out(15) <= '1' when vmdacs = vc09 else '0';
-	vmeaccess_out(16) <= '1' when vmdacs = vc0a else '0';
-	vmeaccess_out(17) <= '1' when vmdacs = vc0b else '0';
-	vmeaccess_out(18) <= '1' when vmdacs = vc0c else '0';
-	vmeaccess_out(19) <= '1' when vmdacs = vc0d else '0';
-	vmeaccess_out(20) <= '1' when vmdacs = vc0e else '0';
-	vmeaccess_out(31 downto 21) <= (others => '0');
 	
 	
 	------------------------------------------------------------------------
@@ -225,6 +191,8 @@ begin
 		elsif (vme_adr = va02) then
 			vme_adr_Next <= va03;
 		elsif (vme_adr = va03) then
+			vme_adr_Next <= va03a;
+		elsif (vme_adr = va03a) then
 			vme_adr_Next <= va04;
 		elsif (vme_adr = va04) then
 			vme_adr_Next <= va05;
@@ -237,39 +205,11 @@ begin
 		else 
 			vme_adr_Next <= va00;
 		end if;
-
---			case vme_adr is
---				when vaRecovery =>
---					vme_adr_Next <= va00;
---				when va00 =>
---					if	asis ='1' then	
---						vme_adr_Next <= va01;
---					else
---						vme_adr_Next <= va00;
---					end if;
---				when va01 =>
---					if	asis ='1' then
---						vme_adr_Next <= va02;
---					else
---						vme_adr_Next <= va00;
---					end if;
---				when va02 => vme_adr_Next <= va03;
---				when va03 => vme_adr_Next <= va04;
---				when va04 => vme_adr_Next <= va05;
---				when va05 => vme_adr_Next <= va0b;
---				when va0b =>
---					if asis ='1' then
---						vme_adr_Next <= va0b;
---					else
---						vme_adr_Next <= va00;				
---					end if;
---				when others => vme_adr_Next <= va00;
---			end case;
    end process;
 -- .............................. synchronize outputs ..................................
 	process(vme_adr) 
 	begin
-		if ( (vme_adr = va02) or (vme_adr=va03) ) then
+		if ( (vme_adr=va03) or (vme_adr=va03a) ) then
 		  ckad <= '1';
 		else
 		  ckad <= '0';
@@ -301,7 +241,6 @@ begin
 	begin
 		if (rising_edge(clk)) then   
 			sel_rnd <= CON(7);   -- CSR random access
-			sel_bt32 <= CON(8);  --  BT 32 bit access
 		end if;
 	end process;
 
@@ -384,94 +323,67 @@ begin
 		begin
 			csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1';
 			if (vmdacs = vc00) and (st_csr_drd ='1') then
-				csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; dph_sta <= x"0"; 		
+				csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; --1011
 				vmdacs_nx <= vc01;						
 			elsif (vmdacs = vc00) and (st_csr_dwr ='1') then
-				csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; dph_sta <= x"0"; 		
+				csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; 
 				vmdacs_nx <= vc08;		
 			elsif (vmdacs = vc00) then
-				csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; dph_sta <= x"0"; 		
+				csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; 
 				vmdacs_nx <= vc00;
 --............................. read csr ................................
 			elsif (vmdacs = vc01) then
-				vmdacs_nx <= vc02;	csr_o <= b"01"; vdcsr <= b"1010"; ack_csr	<='1'; dph_sta <= x"1";
+				vmdacs_nx <= vc02;	csr_o <= b"01"; vdcsr <= b"1010"; ack_csr	<='1'; 
 			elsif (vmdacs = vc02) then
-				vmdacs_nx <= vc03;	csr_o <= b"01"; vdcsr <= b"1010"; ack_csr	<='1'; dph_sta <= x"2";
+				vmdacs_nx <= vc03;	csr_o <= b"01"; vdcsr <= b"1010"; ack_csr	<='1'; 
 			elsif (vmdacs = vc03) then
-				vmdacs_nx <= vc04;	csr_o <= b"01"; vdcsr <= b"1010"; ack_csr	<='1'; dph_sta <= x"3";
-			elsif (vmdacs = vc04) then
-				vmdacs_nx <= vc05;	csr_o <= b"01"; vdcsr <= b"1000"; ack_csr	<='1'; dph_sta <= x"4";
+				vmdacs_nx <= vc04a;	csr_o <= b"01"; vdcsr <= b"1010"; ack_csr	<='1'; 
+			elsif (vmdacs = vc04a) then
+				vmdacs_nx <= vc04aa;	csr_o <= b"01"; vdcsr <= b"1010"; ack_csr	<='1'; 
+			elsif (vmdacs = vc04aa) then
+				vmdacs_nx <= vc04b;	csr_o <= b"01"; vdcsr <= b"1000"; ack_csr	<='1'; 
+			elsif (vmdacs = vc04b) then
+				vmdacs_nx <= vc04c;	csr_o <= b"01"; vdcsr <= b"1001"; ack_csr	<='1'; 
+			elsif (vmdacs = vc04c) then
+				vmdacs_nx <= vc05;	csr_o <= b"01"; vdcsr <= b"1001"; ack_csr	<='1'; 
 			elsif (vmdacs = vc05) and (dsr ='1') then
-				csr_o <= b"01"; vdcsr <= b"1001"; ack_csr	<='0'; dph_sta <= x"5"; 		
+				csr_o <= b"01"; vdcsr <= b"1001"; ack_csr	<='0'; 	
 				vmdacs_nx <= vc05;						
 			elsif (vmdacs = vc05) then
-				csr_o <= b"01"; vdcsr <= b"1001"; ack_csr	<='0'; dph_sta <= x"5"; 		
+				csr_o <= b"01"; vdcsr <= b"1001"; ack_csr	<='0'; 
 				vmdacs_nx <= vc06;						
 			elsif (vmdacs = vc06) then
-				vmdacs_nx <= vc00;	csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; dph_sta <= x"6";
+				vmdacs_nx <= vc00;	csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; 
 --............................. write csr ................................
 			elsif (vmdacs = vc08) then
-				vmdacs_nx <= vc09;	csr_o <= b"10"; vdcsr <= b"0011"; ack_csr	<='1'; dph_sta <= x"8";
+				vmdacs_nx <= vc09;	csr_o <= b"10"; vdcsr <= b"0011"; ack_csr	<='1'; 
 			elsif (vmdacs = vc09) then
-				vmdacs_nx <= vc0a;	csr_o <= b"10"; vdcsr <= b"0011"; ack_csr	<='1'; dph_sta <= x"9";
+				vmdacs_nx <= vc0a;	csr_o <= b"10"; vdcsr <= b"0011"; ack_csr	<='1'; 
 			elsif (vmdacs = vc0a) then
-				vmdacs_nx <= vc0b;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; dph_sta <= x"a";
+				vmdacs_nx <= vc0b;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; 
 			elsif (vmdacs = vc0b) then
-				vmdacs_nx <= vc0c;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; dph_sta <= x"b";
+				vmdacs_nx <= vc0c;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; 
 			elsif (vmdacs = vc0c) then
-				vmdacs_nx <= vc0d;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; dph_sta <= x"c";
+				vmdacs_nx <= vc0ca;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; 
+			elsif (vmdacs = vc0ca) then
+				vmdacs_nx <= vc0caa;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; 
+			elsif (vmdacs = vc0caa) then
+				vmdacs_nx <= vc0caaa;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; 
+			elsif (vmdacs = vc0caaa) then
+				vmdacs_nx <= vc0d;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; 
 			elsif (vmdacs = vc0d) and (dsr ='1') then
-				csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='0'; dph_sta <= x"d"; 		
+				csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='0'; 	
 				vmdacs_nx <= vc0d;
 			elsif (vmdacs = vc0d) then
-				csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='0'; dph_sta <= x"d"; 		
+				csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='0'; 
 				vmdacs_nx <= vc0e;	
 			elsif (vmdacs = vc0e) then
-				vmdacs_nx <= vc00;	csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; dph_sta <= x"e";
+				vmdacs_nx <= vc00;	csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; 
 			elsif (vmdacs = vcRecovery) then
 				vmdacs_nx <= vc00;
 			else
 				vmdacs_nx <= vc00;
 			end if;
-
-
---			case vmdacs is
---				when vc00 => 							csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; dph_sta <= x"0"; 		
---					if st_csr_drd ='1' then
---						vmdacs_nx <= vc01;						
---					elsif st_csr_dwr ='1' then
---						vmdacs_nx <= vc08;		
---					else 	
---						vmdacs_nx <= vc00;
---					end if;
-----............................. read csr ................................
---				when vc01 => vmdacs_nx <= vc02;	csr_o <= b"01"; vdcsr <= b"1010"; ack_csr	<='1'; dph_sta <= x"1"; 								
---				when vc02 => vmdacs_nx <= vc03;	csr_o <= b"01"; vdcsr <= b"1010"; ack_csr	<='1'; dph_sta <= x"2";						
---				when vc03 => vmdacs_nx <= vc04;	csr_o <= b"01"; vdcsr <= b"1010"; ack_csr	<='1'; dph_sta <= x"3";						
---				when vc04 => vmdacs_nx <= vc05;	csr_o <= b"01"; vdcsr <= b"1000"; ack_csr	<='1'; dph_sta <= x"4";						
---				when vc05 => 							csr_o <= b"01"; vdcsr <= b"1001"; ack_csr	<='0'; dph_sta <= x"5"; 		
---					if dsr ='1' then
---						vmdacs_nx <= vc05;						
---					else
---						vmdacs_nx <= vc06;						
---					end if;
---				when vc06 => vmdacs_nx <= vc00;	csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; dph_sta <= x"6";						
-----............................. write csr ................................
---				when vc08 => vmdacs_nx <= vc09;	csr_o <= b"10"; vdcsr <= b"0011"; ack_csr	<='1'; dph_sta <= x"8";
---				when vc09 => vmdacs_nx <= vc0a;	csr_o <= b"10"; vdcsr <= b"0011"; ack_csr	<='1'; dph_sta <= x"9";
---				when vc0a => vmdacs_nx <= vc0b;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; dph_sta <= x"a";
---				when vc0b => vmdacs_nx <= vc0c;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; dph_sta <= x"b";
---				when vc0c => vmdacs_nx <= vc0d;	csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='1'; dph_sta <= x"c";
---				when vc0d => 							csr_o <= b"10"; vdcsr <= b"0111"; ack_csr	<='0'; dph_sta <= x"d"; 		
---					if dsr ='1' then
---						vmdacs_nx <= vc0d;
---					else 
---						vmdacs_nx <= vc0e;	
---					end if;
---				when vc0e => vmdacs_nx <= vc00;	csr_o <= b"00"; vdcsr <= b"1011"; ack_csr	<='1'; dph_sta <= x"e";
---				when vcRecovery => vmdacs_nx <= vc00;
---				when others => vmdacs_nx <= vc00;
---			 end case;
 
 	end process;
 -- ...................................................................................
@@ -516,13 +428,5 @@ begin
 	enable	<=	csr_o(0);	-- address and data bus output
 	AD <= U_DAT_IN when enable ='1' else (others => 'Z');		  
 	
-	DB(0) <= asis;
-	DB(1) <= dsr;
-	DB(2) <= sel_rnd;
-	DB(3) <= ckad;
-	DB(4) <= not wrs;
-	DB(5) <= csr_o(0);
-	DB(6) <= csr_o(1);
-	DB(7) <= ack_csr;
 	
 end Behavioral;

@@ -77,6 +77,7 @@ end vuprom_MoellerDAQ;
 
 
 architecture rtl of vuprom_MoellerDAQ is
+	attribute keep : string;
 
 	--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
 	--     VME access 
@@ -127,20 +128,16 @@ architecture rtl of vuprom_MoellerDAQ is
 	signal u_ad_reg 		:std_logic_vector(31 downto 2);
 	signal u_dat_in 		:std_logic_vector(31 downto 0);	
 	signal u_data_o 		:std_logic_vector(31 downto 0);	
-	signal vme_debug: std_logic_vector ( 7 downto 0);
 	signal ckaddr, ws		: std_logic;
 	
 	signal VN2andVN1 : std_logic_vector(7 downto 0); -- setting of VN1 and VN2 wheels for VMEbus address
-	signal vmeaccess_out : std_logic_vector(31 downto 0);
 	signal VMEAccess_Reset : std_logic;
 
 	COMPONENT vme_access
 	  generic (
-		 BASE_AD : std_logic_vector( 23 downto 20) := csr_ad
-														 -- VME base address D23 to D 20
+		 BASE_AD : std_logic_vector( 23 downto 20) := csr_ad  -- VME base address D23 to D 20
 		 );
 	  Port ( AD : inout  STD_LOGIC_VECTOR (31 downto 0);
-				vmeaccess_out : out STD_LOGIC_VECTOR (31 downto 0);			
 				VME_Reset : in std_logic;
 				  ASI : in  STD_LOGIC;
 				  WRI : in  STD_LOGIC;
@@ -148,7 +145,6 @@ architecture rtl of vuprom_MoellerDAQ is
 				  DS1I : in  STD_LOGIC;
 				  CON : inout  STD_LOGIC_VECTOR (15 downto 0);
 				  VN2andVN1 : out std_logic_vector(7 downto 0);
-				  DB : out  STD_LOGIC_VECTOR (7 downto 0);
 				  CKADDR : out STD_LOGIC;
 				  WS : out STD_LOGIC;
 				  CKCSR : out  STD_LOGIC;
@@ -168,7 +164,7 @@ architecture rtl of vuprom_MoellerDAQ is
 --+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
 --     CLOCK 
 --+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
-	signal clk50, clk100, clk200, clk400: std_logic;
+	signal clk50, clk100, clk200, clk400, clk1 : std_logic;
 	signal clk_rst, clk_locked: std_logic_vector ( 3 downto 0);
 
 	COMPONENT clock_boost
@@ -180,7 +176,9 @@ architecture rtl of vuprom_MoellerDAQ is
 		CLK50MHz_OUT : OUT std_logic;
 		CLK100MHz_OUT : OUT std_logic;
 		CLK200MHz_OUT : OUT std_logic;
-		CLK400MHz_OUT : OUT std_logic
+		CLK400MHz_OUT : OUT std_logic;
+		clock1MHz_OUT : out  STD_LOGIC;
+		clock0_5Hz_OUT : out  STD_LOGIC
 		);
 	END COMPONENT;
  
@@ -235,7 +233,7 @@ architecture rtl of vuprom_MoellerDAQ is
 	--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
 
 	signal scal_data_o : std_logic_vector(31 downto 0);
-	constant SCCH: integer := 32*4; --For inputs IN1, IN2, INOUT1, INOUT3, and AdditionalCountersOut
+	constant SCCH: integer := 32*3; --For inputs IN1, INOUT3 and AdditionalCountersOut
 	constant SCBit: integer := 32;
 	signal scal_in : std_logic_vector(SCCH-1 downto 0);
 	signal scal_oecsr : std_logic;
@@ -249,7 +247,8 @@ architecture rtl of vuprom_MoellerDAQ is
 		port (
 			clkl : in STD_LOGIC;
 			clkh : in STD_LOGIC;		
-			scal_in : STD_LOGIC_VECTOR ( (SCCH-1) downto 0);				
+			scal_in : in STD_LOGIC_VECTOR ( (NCh-1) downto 0);				
+			ScalerGate : in std_logic;
 			--............. vme interface .............
 			u_ad_reg :in std_logic_vector(11 downto 2);
 			u_dat_in :in std_logic_vector(31 downto 0);
@@ -270,6 +269,8 @@ architecture rtl of vuprom_MoellerDAQ is
 	signal trig_oecsr : std_logic;
 	signal trig_ckcsr : std_logic;
 	signal AdditionalCountersOut : std_logic_vector(31 downto 0);
+	signal DAQ_LiveTime_Gate : std_logic;
+	signal DAQ_Enabled_Out : std_logic;
 
 	component trigger
 		port (
@@ -285,7 +286,9 @@ architecture rtl of vuprom_MoellerDAQ is
 			pgxled   : out STD_LOGIC_VECTOR(8 downto 1); -- 8 LEDs on PIG board
 			Global_Reset_After_Power_Up : in std_logic;
 			VN2andVN1 : in std_logic_vector(7 downto 0);
-			AdditionalCountersOut : out std_logic_vector(31 downto 0);
+			DAQ_LiveTime_Gate : out std_logic;
+			DAQ_Enabled_Out : out std_logic;
+			AdditionalCountersOut : out std_logic_vector(11 downto 0);
 			--............................. vme interface ....................
 			u_ad_reg :in std_logic_vector(11 downto 2);
 			u_dat_in :in std_logic_vector(31 downto 0);
@@ -316,7 +319,9 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 		CLK200MHz_OUT => clk200,
 		CLK400MHz_OUT => clk400,
 		CLK_LOCKED_OUT => clk_locked,
-		CLK_RST_IN => clk_rst
+		CLK_RST_IN => clk_rst,
+		clock1MHz_OUT => clk1,
+		clock0_5Hz_OUT => open
 	);
 
 	------------------------------------------------------------------------------------------
@@ -334,7 +339,6 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 	
 	vme_access_1: vme_access PORT MAP(
 			AD => AD,
-			vmeaccess_out => vmeaccess_out,
 			VME_Reset => VMEAccess_Reset,
 				ASI => ASI,
            WRI => WRI,
@@ -342,7 +346,6 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
            DS1I => DS1I,
            CON => CON,
 			  VN2andVN1 => VN2andVN1,
-           DB => vme_debug,
 			 CKADDR => ckaddr,
 			 WS => ws,
 				CKCSR => ckcsr,
@@ -354,11 +357,12 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 			  );
 
 	--VMEAccess_Reset <= LEMIN1;
+	VMEAccess_Reset <= '0';
 	BERRO		<= '1';  	-- H means inactive
 	IACKOU	<= IACKII; 	-- interrupt acknowledge chain
 --		SRESI				-- system reset
 	CAIV		<=	'1';	-- clock for address ram0begister internal<-VME, disabled
-	OAIV		<=	'1';	-- OE for address register internal<-VME, disabled
+	OAIV		<=	'1';	-- OE for address register internal<-VME, disabled, '1' means high
 	IRBLO	<= '1';
 
 	
@@ -369,9 +373,6 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 	ymdt(15 downto 8) <=  CONV_STD_LOGIC_VECTOR(DATE, 8);
 	ymdt(23 downto 16) <= CONV_STD_LOGIC_VECTOR(MONTH, 8);
 	ymdt(31 downto 24) <= CONV_STD_LOGIC_VECTOR(YEAR, 8);
---	tdcsetting(7 downto 0) <=  b"00000001";
---	tdcsetting(15 downto 8) <=  CONV_STD_LOGIC_VECTOR(TDCCH, 8);
---	tdcsetting(23 downto 16) <= CONV_STD_LOGIC_VECTOR(TDCBIT, 8);
 
 	process(clk50, oecsr, ckcsr, u_ad_reg)
 	begin
@@ -392,9 +393,9 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 	process(clk50, top_ckcsr, u_ad_reg)
 	begin
 		if (clk50'event and clk50 ='1') then
+			vme_clkrst(1) <='0';
 			if (top_ckcsr='1' and u_ad_reg(11 downto 2)=vmead_clkstatus) then
 					vme_clkrst(1) <= u_dat_in(1);
-			else vme_clkrst(1) <='0';
 			end if;
 		end if;
 		vme_clkrst(0)<='0';
@@ -404,6 +405,7 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 		process(clk50, top_oecsr, u_ad_reg)
 		begin
    		if (clk50'event and clk50 ='1') then
+				top_data_o <= (others => '0');
     			if (top_oecsr='1' and u_ad_reg(11 downto 2)=vmead_clkstatus) then 
 							top_data_o <= EXT(vme_clkstatus,32); 
 	    		elsif (top_oecsr='1' and u_ad_reg(11 downto 2)=vmead_ymdt) then 
@@ -501,33 +503,19 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 
 	OU1X( 32 downto 1)   <= vhdc_out ( 31 downto 0);
 	PGIO4X( 32 downto 1) <= vhdc_out ( 63 downto 32);
---	PGIO2X( 32 downto 1) <= vhdc_out ( 63 downto 32);
---	PGIO3X( 32 downto 1) <= vhdc_out ( 95 downto 64);
---	PGIO4X( 32 downto 1) <= vhdc_out ( 127 downto 96);
-
---	LEMONIM<= tdc_tst_stop_o or trig_allor;
---	LEMONIM<= tdc_tst_stop_o or LEMIN1;
 
 
---	vhdc_out <= tdc_tst_start_o or trig_out;
 
-	--vhdc_out <= trig_out(63 downto 32)&vmeaccess_out;
+
 	vhdc_out <= trig_out;
 
--- tdc i/o
---	tdc_start( 127 downto 0)  <= vhdc_in( 127 downto 0) ;
 
-----	tdc_stop <= LEMIN1;
-----  tdc_clr <= '0';
-----	tdc_en <= '1';
---	tdc_selrnd <= CON(7);
 
 
 -- scaler i/o
-	--scal_in(32*4-1 downto 0) <= (others => '0'); --vhdc_in(63 downto 0) ;
-	scal_in <= AdditionalCountersOut &
-		PGIO1X ( 32 downto 1) & IN2X ( 32 downto 1) & IN1X (32 downto 1); --PGIO3X ( 32 downto 1) &
---	scal_in <= AdditionalCountersOut ;
+	AdditionalCountersOut(31) <= clk1 when DAQ_LiveTime_Gate = '1' else '0';
+	AdditionalCountersOut(30) <= clk1 when DAQ_Enabled_Out = '1' else '0';
+	scal_in <= AdditionalCountersOut & PGIO3X ( 32 downto 1) & IN1X (32 downto 1); --PGIO3X ( 32 downto 1) &
 	
 	
 -- trigger i/o
@@ -565,6 +553,7 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 		port map (
 			clkl=>clk50, clkh => clk200,
 			scal_in=>scal_in, 
+			ScalerGate => '1',
 			u_ad_reg=>u_ad_reg(11 downto 2), 
 			u_dat_in=>u_dat_in, 
 			u_data_o=>scal_data_o,
@@ -609,7 +598,9 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 			pgxled => pgxled,
 			Global_Reset_After_Power_Up => Global_Reset_After_Power_Up_Delay_1msec,
 			VN2andVN1 => VN2andVN1,
-			AdditionalCountersOut => AdditionalCountersOut,
+			DAQ_LiveTime_Gate => DAQ_LiveTime_Gate,
+			DAQ_Enabled_Out => DAQ_Enabled_Out,
+			AdditionalCountersOut => AdditionalCountersOut(11 downto 0),
 			u_ad_reg=>u_ad_reg(11 downto 2), 
 			u_dat_in=>u_dat_in, 
 			u_data_o=>trig_data_o,
@@ -656,16 +647,7 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 	hpv(1)<=CON(8);
 	hpv(6downto 2)<=CON(4 downto 0);
 	hpv(7) <= clk50;
---	-- vme_debug 
-----	DB(0) <= asis;
-----	DB(1) <= dsr;
-----	DB(2) <= sel_rnd;
-----	DB(3) <= ckad;
-----	DB(4) <= not wrs;
-----	DB(5) <= oecsr;
-----	DB(6) <= ckcsr;
-----	DB(7) <= ack_csr
-	hpv(15 downto 8 ) <= vme_debug ( 7 downto 0);
+	hpv(15 downto 8 ) <= (others => '0');
 	
 
 

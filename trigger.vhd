@@ -19,7 +19,9 @@ entity trigger is
 		pgxled   : out STD_LOGIC_VECTOR(8 downto 1); -- 8 LEDs on PIG board
 		Global_Reset_After_Power_Up : in std_logic;
 		VN2andVN1 : in std_logic_vector(7 downto 0);
-		AdditionalCountersOut : out std_logic_vector(31 downto 0); --0..3 for e- Flux Mesaurement
+		DAQ_LiveTime_Gate : out std_logic;
+		DAQ_Enabled_Out : out std_logic;
+		AdditionalCountersOut : out std_logic_vector(11 downto 0); --0..3 for e- Flux Mesaurement
 		-- VME interface ------------------------------------------------------
 		u_ad_reg :in std_logic_vector(11 downto 2);
 		u_dat_in :in std_logic_vector(31 downto 0);
@@ -30,33 +32,42 @@ end trigger;
 
 
 architecture RTL of trigger is
+	constant FirmwareType: integer := 3;
+	constant FirmwareRevision: integer := 42;
+	signal TRIG_FIXED : std_logic_vector(31 downto 0); 
 
-	subtype sub_Adress is std_logic_vector(11 downto 4);
-	constant BASE_TRIG_DAQ_Status : sub_Adress   							:= x"02"; -- r
-	constant BASE_TRIG_DAQ_Reset : sub_Adress   								:= x"03"; -- r/w
-	constant BASE_TRIG_DAQ_Enabled : sub_Adress   							:= x"04"; -- r/w
-	constant BASE_TRIG_DAQ_Counter_Fix : sub_Adress   						:= x"05"; -- w
-	constant BASE_TRIG_DAQ_Counter_LiveTime : sub_Adress   				:= x"06"; -- r
-	constant BASE_TRIG_DAQ_Counter_LiveTimeGated : sub_Adress   		:= x"07"; -- r
-	constant BASE_TRIG_VN2andVN1						 : sub_Adress   		:= x"08"; -- r --Setting of VN1 and VN2
-	constant BASE_TRIG_MAMIEnergySetting			 : sub_Adress   		:= x"09"; -- r/w
-	constant BASE_TRIG_InputChannelsDebugMode			 : sub_Adress   		:= x"0a"; -- r/w --Enable this, if you want to find the corresponding Moeller channels
-	constant BASE_TRIG_InputChannelDebugLeftStart	 : sub_Adress   		:= x"0b"; -- r/w left channel (lower energy) to start with
-	constant BASE_TRIG_InputChannelDebugRightStart	 : sub_Adress   		:= x"0c"; -- r/w right channel (higher energy) to start with
+	subtype sub_Address is std_logic_vector(11 downto 4);
+	constant BASE_TRIG_DAQ_Status : sub_Address   							:= x"02"; -- r
+	constant BASE_TRIG_DAQ_Reset : sub_Address   							:= x"03"; -- r/w
+	constant BASE_TRIG_DAQ_Enabled : sub_Address   							:= x"04"; -- r
 	
-	constant BASE_TRIG_HistogramRAM_WEB : sub_Adress    						:= x"c0"; -- r/w
-	constant BASE_TRIG_HistogramRAM_AddrB : sub_Adress    					:= x"c1"; -- r/w
-	constant BASE_TRIG_HistogramRAM_DInB : sub_Adress    						:= x"c2"; -- r/w
-	constant BASE_TRIG_HistogramRAM_DOutB0 : sub_Adress    					:= x"80"; -- r
-	constant BASE_TRIG_HistogramRAM_DOutB_Base : sub_Adress      			:= x"81"; -- r
+	constant BASE_TRIG_DAQGateAllCards : sub_Address    					:= x"20"; -- r/w
 
-	constant BASE_TRIG_DebugTrigIn : sub_Adress    								:= x"0f"; -- r/w
-	signal DebugTrigIn : std_logic_vector(31 downto 0);
+	constant BASE_TRIG_HistogramRAM_WEB : sub_Address    					:= x"c0"; -- r
+	constant BASE_TRIG_HistogramRAM_AddrB : sub_Address    				:= x"c1"; -- r/w
+	constant BASE_TRIG_HistogramRAM_DInB : sub_Address    				:= x"c2"; -- r/w
+	constant BASE_TRIG_HistogramRAM_DOutB0 : sub_Address    				:= x"80"; -- r
+	constant BASE_TRIG_HistogramRAM_DOutB_Base : sub_Address      		:= x"81"; -- r
+
+	constant BASE_TRIG_ChSelectorPart0 : sub_Address      				:= x"60"; -- r/w
+	constant BASE_TRIG_ChSelectorPart1 : sub_Address      				:= x"61"; -- r/w
+	constant BASE_TRIG_ChSelectorPart2 : sub_Address      				:= x"62"; -- r/w
+	constant BASE_TRIG_ChSelectorPart3 : sub_Address      				:= x"63"; -- r/w
+	constant BASE_TRIG_ChSelectorPart4 : sub_Address      				:= x"64"; -- r/w
+	constant BASE_TRIG_ChSelectorPart5 : sub_Address      				:= x"65"; -- r/w
+	constant BASE_TRIG_ChSelectorPart6 : sub_Address      				:= x"66"; -- r/w
+	constant BASE_TRIG_ChSelectorPart7 : sub_Address      				:= x"67"; -- r/w
+
+	--debug
+	constant BASE_TRIG_Debug_ActualState : sub_Address							:= x"e0"; --r
+	constant BASE_TRIG_SelectedDebugInput_1 : sub_Address						:= x"e1"; --r/w
+	constant BASE_TRIG_SelectedDebugInput_2 : sub_Address						:= x"e2"; --r/w
+	constant BASE_TRIG_SelectedDebugInput_3 : sub_Address						:= x"e3"; --r/w
+	constant BASE_TRIG_SelectedDebugInput_4 : sub_Address						:= x"e4"; --r/w
 	
-	signal MAMIEnergySetting : std_logic_vector(2 downto 0); --To set up the Inputs depending on MAMI energy
-	signal InputChannelsDebugMode : std_logic; 
-	signal InputChannelDebugLeftStart, InputChannelDebugRightStart : std_logic_vector(7 downto 0);
-	
+	signal ChSelectorMask : std_logic_vector(32*8-1 downto 0) := (others => '0');
+
+	signal DAQGateAllCards : std_logic;
 	signal DAQ_Enabled : std_logic;
 	signal DAQ_Reset : std_logic;
 	signal Clock400GateEnable : std_logic;
@@ -66,8 +77,7 @@ architecture RTL of trigger is
 	signal HistogramRAM_AddrB : std_logic_VECTOR(8 downto 0);
 	signal HistogramRAM_DInB : std_logic_VECTOR(31 downto 0);
 	
-	constant BASE_TRIG_FIXED : sub_Adress 					:= x"f0" ; -- r
-	constant TRIG_FIXED : std_logic_vector(31 downto 0) := x"0a100927"; --Universal File, Date: 30.11.2010
+	constant BASE_TRIG_FIXED : sub_Address 										:= x"f0" ; -- r
 
 
 
@@ -247,9 +257,6 @@ architecture RTL of trigger is
 	attribute fsm_encoding: string;
 	attribute fsm_encoding of DAQ_State: signal is "user"; -- "{auto | one-hot | compact | sequential | gray | johnson | speed1 | user}";
 	
-	signal DAQ_Counter_LiveTime, DAQ_Counter_LiveTimeGated : std_logic_vector(39 downto 0) := x"0000000000";
-	signal DAQ_Counter_LiveTime_Fix, DAQ_Counter_LiveTimeGated_Fix : std_logic_vector(31 downto 0) := x"00000000";
-	signal DAQ_Counter_Fix : std_logic;
 	signal GatedGlock400, GlobalTDCHitClear : std_logic;
 	
 	--FSM RAM
@@ -275,7 +282,7 @@ architecture RTL of trigger is
 	---------------------------------------------------------------------------------
 	-- Signals to/from MAMI to control the electron source
 	---------------------------------------------------------------------------------
-	signal MAMIElectronSourceSetting : std_logic_vector(3 downto 0);
+	signal MAMIElectronSourceSetting : std_logic_vector(1 downto 0);
 	signal MAMIElectronSourceSettingLastStatus : std_logic;
 	---------------------------------------------------------------------------------
 
@@ -290,29 +297,80 @@ architecture RTL of trigger is
 				Output : out  STD_LOGIC);
 	end component;
 	signal Tagger16ORs : std_logic_vector(5 downto 0); --6 Big ORS for inputs IN1, IN2, INOUT1
-	signal AdditionalCountersOut_Intermediate : std_logic_vector(31 downto 0); --6 16OR Counters for 2 helicities for 2 ranges
---	signal TaggerOR_SelectedCh_Heli0, TaggerOR_SelectedCh_Heli1 : std_logic;
 	signal FluxCounterEnable : std_logic;
---	signal TaggerOR_SelectedCh_Heli0_Last0, TaggerOR_SelectedCh_Heli1_Last0 : std_logic;
---	signal TaggerOR_SelectedCh_Heli0_Last1, TaggerOR_SelectedCh_Heli1_Last1 : std_logic;
---	signal TaggerOR_SelectedCh_Heli0_underdriven, TaggerOR_SelectedCh_Heli1_underdriven : std_logic_vector(7 downto 0);
 	---------------------------------------------------------------------------------
+
+	---------------------------------------------------------------------------------
+	-- For all components
+	constant NDebugSignalOutputs : integer := 4;
+	signal SelectedDebugInput : std_logic_vector(8*NDebugSignalOutputs-1 downto 0);
+	signal Debug_ActualState : std_logic_vector(NDebugSignalOutputs-1 downto 0);
+	signal DebugSignals : std_LOGIC_VECTOR(255 downto 0);
+
+	COMPONENT DebugChSelector
+	PORT(
+		DebugSignalsIn : IN std_logic_vector(255 downto 0);
+		SelectedInput : IN std_logic_vector(7 downto 0);          
+		SelectedOutput : OUT std_logic
+		);
+	END COMPONENT;
+	---------------------------------------------------------------------------------
+
+	---------------------------------------------------------------------------------
+	-- Tagger Ch Selector Signals
+	signal PairSpecModule1, PairSpecModule2, PairSpecModule3, PairSpecModule4 : std_logic_vector(15 downto 0);
+	signal PairSpecModulesCombined : std_logic_vector(7 downto 0);
+	signal SelectedTaggerCh : std_logic_vector(31 downto 0);
+	---------------------------------------------------------------------------------
+
 begin
+	TRIG_FIXED(31 downto 24) <= CONV_STD_LOGIC_VECTOR(FirmwareType, 8);
+	TRIG_FIXED(23 downto 16) <= CONV_STD_LOGIC_VECTOR(0, 8);
+	TRIG_FIXED(15 downto 0)  <= CONV_STD_LOGIC_VECTOR(FirmwareRevision, 16);
+
+	-------------------------------------------------------------------------------------------------
+	-- Debug Selector
+	DebugSignals(191 downto 0) <= trig_in;
+	DebugSignals(255) <= NIM_IN;
+	
+	DebugChSelectors: for i in 0 to NDebugSignalOutputs-1 generate
+	begin
+		Inst_DebugChSelector: DebugChSelector PORT MAP(
+			DebugSignalsIn => DebugSignals,
+			SelectedInput => SelectedDebugInput((i+1)*8-1 downto i*8),
+			SelectedOutput => Debug_ActualState(i)
+		);
+	end generate;
+	-------------------------------------------------------------------------------------------------
+
+	SelectedTaggerChs: for i in 0 to 7 generate
+	begin
+		PairSpecModulesCombined <= PairSpecModule4(8)&PairSpecModule4(0)&PairSpecModule3(8)&PairSpecModule3(0)&PairSpecModule2(8)&PairSpecModule2(0)&PairSpecModule1(8)&PairSpecModule1(0);
+		SelectedTaggerCh(0+i)  <= '1' when (ChSelectorMask(7+(i+0 )*8 downto 0+(i+0 )*8) and PairSpecModulesCombined) /= "0" else '0';
+		SelectedTaggerCh(8+i)  <= '1' when (ChSelectorMask(7+(i+8 )*8 downto 0+(i+8 )*8) and PairSpecModulesCombined) /= "0" else '0';
+		SelectedTaggerCh(16+i) <= '1' when (ChSelectorMask(7+(i+16)*8 downto 0+(i+16)*8) and PairSpecModulesCombined) /= "0" else '0';
+		SelectedTaggerCh(24+i) <= '1' when (ChSelectorMask(7+(i+24)*8 downto 0+(i+24)*8) and PairSpecModulesCombined) /= "0" else '0';
+	end generate;
+	
+	--signals to exp trigger via out1
+	trig_out(27 downto 0) <= SelectedTaggerCh(27 downto 0);
+	trig_out(28+NDebugSignalOutputs-1 downto 28) <= Debug_ActualState;
+	
+	--signals for external detector tests
+	trig_out(31+32 downto 32) <= SelectedTaggerCh;
+
 	------------------------------------------------------------------------------------------------
 	-- show the actual status of the machine using leds
-	led(8 downto 1) <= not x"0f";
-	pgxled(8 downto 1) <= not x"33";
+	led(8 downto 1) <= not x"00";
+	pgxled(8 downto 1) <= not x"00";
 	------------------------------------------------------------------------------------------------
 	
 	---------------------------------------------------------------------------------
 	-- Signals to/from MAMI to control the electron source
 	---------------------------------------------------------------------------------
-	-- Pin 0 = mami response (+)
-	-- Pin 1 = output from generator (+)
-	-- Pin 2 = inverted output from generator (-)
-	-- Pin 3 = inhibit, if set, status of source is indetermined
-	MAMIElectronSourceSetting <= trig_in(3+32*5 downto 0+32*5); 
-	--MAMIElectronSourceSetting <= "0100"; -- if no cable is connected at all
+	-- Pin 0 = output from generator (+)
+	-- Pin 1 = inhibit, if set, status of source is indetermined
+	MAMIElectronSourceSetting <= trig_in(1+32*5 downto 0+32*5); 
 
 	SaveLastMAMiSourceStatus: process(GlobalTDCHitClear)
 	begin
@@ -321,8 +379,6 @@ begin
 		end if;
 	end process;
 	
---	AdditionalCountersOut_Intermediate(4) <= clock50 when (MAMIElectronSourceSetting(0) = '0') and (MAMIElectronSourceSetting(3) = '0') else '0';
---	AdditionalCountersOut_Intermediate(5) <= clock50 when (MAMIElectronSourceSetting(0) = '1') and (MAMIElectronSourceSetting(3) = '0') else '0';
 	---------------------------------------------------------------------------------
 	
 	------------------------------------------------------------------------------------------------
@@ -331,14 +387,11 @@ begin
 	Inst_MoellerTrigger: MoellerTrigger PORT MAP(
 		TChannelIn => TDCTrig_in,  -- channels from tagger
 		TriggerOut => MoellerTriggerSignal, -- Evtl. Moeller Trigger Signal auch verlängern
-		InhibitOutput => MAMIElectronSourceSetting(3), --or '0', If MAMI source is undetermined, do not produce Triggers
+		InhibitOutput => MAMIElectronSourceSetting(1), --or '0', If MAMI source is undetermined, do not produce Triggers
 		CLOCK => clock100
 	);
-	--MoellerTriggerSignal <= '1';
 	
-	-- GlobalInputGate <= MoellerTriggerSignal; -- Regardles whether the electronics is ready for taking data or not
-	--	GlobalInputGate <= '1';
-	GlobalInputGate <= not MAMIElectronSourceSetting(3);
+	GlobalInputGate <= not MAMIElectronSourceSetting(1);
 	------------------------------------------------------------------------------------------------
 	
 	
@@ -358,167 +411,40 @@ begin
 	------------------------------------------------------------------------------------------
 	-- Select Left and Right Channels for Debug
 	------------------------------------------------------------------------------------------
-	InputChannelDebugLeftGroup <= 
-		trig_in(0+NumberOfLeftChannels-1 downto 0) when InputChannelDebugLeftStart = x"00" else
-		trig_in(1+NumberOfLeftChannels-1 downto 1) when InputChannelDebugLeftStart = x"01" else
-		trig_in(2+NumberOfLeftChannels-1 downto 2) when InputChannelDebugLeftStart = x"02" else
-		trig_in(3+NumberOfLeftChannels-1 downto 3) when InputChannelDebugLeftStart = x"03" else
-		trig_in(4+NumberOfLeftChannels-1 downto 4) when InputChannelDebugLeftStart = x"04" else
-		trig_in(5+NumberOfLeftChannels-1 downto 5) when InputChannelDebugLeftStart = x"05" else
-		trig_in(6+NumberOfLeftChannels-1 downto 6) when InputChannelDebugLeftStart = x"06" else
-		trig_in(7+NumberOfLeftChannels-1 downto 7) when InputChannelDebugLeftStart = x"07" else
-		trig_in(8+NumberOfLeftChannels-1 downto 8) when InputChannelDebugLeftStart = x"08" else
-		trig_in(9+NumberOfLeftChannels-1 downto 9) when InputChannelDebugLeftStart = x"09" else
-		trig_in(10+NumberOfLeftChannels-1 downto 10) when InputChannelDebugLeftStart = x"0a" else
-		trig_in(11+NumberOfLeftChannels-1 downto 11) when InputChannelDebugLeftStart = x"0b" else
-		trig_in(12+NumberOfLeftChannels-1 downto 12) when InputChannelDebugLeftStart = x"0c" else
-		trig_in(13+NumberOfLeftChannels-1 downto 13) when InputChannelDebugLeftStart = x"0d" else
-		trig_in(14+NumberOfLeftChannels-1 downto 14) when InputChannelDebugLeftStart = x"0e" else
-		trig_in(15+NumberOfLeftChannels-1 downto 15) when InputChannelDebugLeftStart = x"0f" else
-		trig_in(16+NumberOfLeftChannels-1 downto 16) when InputChannelDebugLeftStart = x"10" else
-		trig_in(17+NumberOfLeftChannels-1 downto 17) when InputChannelDebugLeftStart = x"11" else
-		trig_in(18+NumberOfLeftChannels-1 downto 18) when InputChannelDebugLeftStart = x"12" else
-		trig_in(19+NumberOfLeftChannels-1 downto 19) when InputChannelDebugLeftStart = x"13" else
-		trig_in(20+NumberOfLeftChannels-1 downto 20) when InputChannelDebugLeftStart = x"14" else
-		trig_in(21+NumberOfLeftChannels-1 downto 21) when InputChannelDebugLeftStart = x"15" else
-		trig_in(22+NumberOfLeftChannels-1 downto 22) when InputChannelDebugLeftStart = x"16" else
-		(others => '0');
-	
-	InputChannelDebugRightGroup <=
-		trig_in(0+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 0+96) when InputChannelDebugRightStart = x"00" else
-		trig_in(1+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 1+96) when InputChannelDebugRightStart = x"01" else
-		trig_in(2+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 2+96) when InputChannelDebugRightStart = x"02" else
-		trig_in(3+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 3+96) when InputChannelDebugRightStart = x"03" else
-		trig_in(4+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 4+96) when InputChannelDebugRightStart = x"04" else
-		trig_in(5+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 5+96) when InputChannelDebugRightStart = x"05" else
-		trig_in(6+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 6+96) when InputChannelDebugRightStart = x"06" else
-		trig_in(7+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 7+96) when InputChannelDebugRightStart = x"07" else
-		trig_in(8+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 8+96) when InputChannelDebugRightStart = x"08" else
-		trig_in(9+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 9+96) when InputChannelDebugRightStart = x"09" else
-		trig_in(10+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 10+96) when InputChannelDebugRightStart = x"0a" else
-		trig_in(11+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 11+96) when InputChannelDebugRightStart = x"0b" else
-		trig_in(12+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 12+96) when InputChannelDebugRightStart = x"0c" else
-		trig_in(13+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 13+96) when InputChannelDebugRightStart = x"0d" else
-		trig_in(14+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 14+96) when InputChannelDebugRightStart = x"0e" else
-		trig_in(15+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 15+96) when InputChannelDebugRightStart = x"0f" else
-		trig_in(16+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 16+96) when InputChannelDebugRightStart = x"10" else
-		trig_in(17+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 17+96) when InputChannelDebugRightStart = x"11" else
-		trig_in(18+NumberOfTDCs-NumberOfLeftChannels-1+96 downto 18+96) when InputChannelDebugRightStart = x"12" else
-		(others => '0');
+	InputChannelDebugLeftGroup <= trig_in(0+NumberOfLeftChannels-1 downto 0);
+	InputChannelDebugRightGroup <= trig_in(0+NumberOfTDCs-1 downto NumberOfLeftChannels);
+	NIM_OUT <= DAQGateAllCards; --send to NIM OUT and then to all other VUPROMs via NIM IN
+
+	DAQ_Enabled <= NIM_IN;
+	DAQ_Enabled_out <= DAQ_Enabled;
 	------------------------------------------------------------------------------------------
 	
 	------------------------------------------------------------------------------------------
 	-- TDCs
 	------------------------------------------------------------------------------------------
-   -- The first (0,1,...) NumberOfLeftChannels TDC have to be "left" ones.
-	-- Then comes the right ones.
-		--	--TDCTrig_in <= trig_in(124 downto 111)&trig_in(9 downto 0); --For Module 0x04, for 1557MeV @ 28.5.2010
-		--	TDCTrig_in <= trig_in(111 downto 98)&trig_in(19 downto 10); --For Module 0x03, for 1557MeV @ 28.5.2010
-		--	TDCTrig_in <= trig_in(124 downto 111)&trig_in(9+4+3 downto 0+4+3); --For Module 0x04, for 450MeV @ 28.6.2010
-		--TDCTrig_in <= trig_in(111 downto 98)&trig_in(19+4+3 downto 10+4+3); --For Module 0x03, for 450MeV @ 28.6.2010
-	
-	TDCTrig_in <= 
-		--Debug purposes
-		InputChannelDebugRightGroup & InputChannelDebugLeftGroup	when (InputChannelsDebugMode = '1')  else
-		
-		--For Module 0x01, for 450MeV @ 13.9.2010
-		trig_in(118 downto 105)	&trig_in(31 downto 24)&trig_in(11)&trig_in(23)	when (MAMIEnergySetting = "010") and (VN2andVN1 = x"01") and (InputChannelsDebugMode = '0')  else
-		--For Module 0x01, for 1557MeV @ 13.9.2010
-		trig_in(111 downto 98)	&trig_in(31 downto 24)&trig_in(11)&trig_in(23)	when (MAMIEnergySetting = "001") and (VN2andVN1 = x"01") and (InputChannelsDebugMode = '0')  else
-		
-		--For Module 0x02, for 450MeV @ 13.9.2010
-		trig_in(113 downto 100)	&trig_in(81 downto 72)				when (MAMIEnergySetting = "010") and (VN2andVN1 = x"02") and (InputChannelsDebugMode = '0')  else
-		--For Module 0x02, for 1557MeV @ 13.9.2010
-		trig_in(113 downto 100)	&trig_in(9 downto 0)					when (MAMIEnergySetting = "001") and (VN2andVN1 = x"02") and (InputChannelsDebugMode = '0')  else
-		
-		--For Module 0x03, for 450MeV @ 28.6.2010
-		trig_in(111 downto 98)	&trig_in(19+4+3 downto 10+4+3) 	when (MAMIEnergySetting = "010") and (VN2andVN1 = x"03") and (InputChannelsDebugMode = '0')  else
-		--For Module 0x03, for 1557MeV @ 28.5.2010
-		trig_in(111 downto 98)	&trig_in(19 downto 10) 				when (MAMIEnergySetting = "001") and (VN2andVN1 = x"03") and (InputChannelsDebugMode = '0')  else
-		
-		--For Module 0x04, for 450MeV @ 28.6.2010
-		trig_in(124 downto 111)	&trig_in(9+4+3 downto 0+4+3) 	when (MAMIEnergySetting = "010") and (VN2andVN1 = x"04") and (InputChannelsDebugMode = '0')  else
-		--For Module 0x04, for 1557MeV @ 28.5.2010
-		trig_in(124 downto 111)&trig_in(9 downto 0) 				when (MAMIEnergySetting = "001") and (VN2andVN1 = x"04") and (InputChannelsDebugMode = '0') else
-		(others => '0');
---	trig_out(NumberOfTDCs-1 downto 0) <= TDCTrig_in;
+   -- The first (0,1,...) NumberOfLeftChannels TDC have to be "left" ones. Then come the right ones.
+	TDCTrig_in <= InputChannelDebugRightGroup & InputChannelDebugLeftGroup;
 
 	---------------------------------------------------------------------------------
 	-- Signals for MAMI e- flux counting
 	---------------------------------------------------------------------------------
---	TaggerOR_SelectedCh_Heli0 <= '1' when (TDCTrig_in /= "0") and (DAQ_Enabled = '1') and 
---		(MAMIElectronSourceSetting(0) = '0') and (MAMIElectronSourceSetting(3) = '0') else '0';
---	TaggerOR_SelectedCh_Heli1 <= '1' when (TDCTrig_in /= "0") and (DAQ_Enabled = '1') and 
---		(MAMIElectronSourceSetting(0) = '1') and (MAMIElectronSourceSetting(3) = '0') else '0';
-	FluxCounterEnable <= '1' when (DAQ_Enabled = '1') and (MAMIElectronSourceSetting(3) = '0') else '0';
+	FluxCounterEnable <= '1' when (DAQ_Enabled = '1') and (MAMIElectronSourceSetting(1) = '0') else '0';
 	
-	Tagger16ORs(0) <= '1' when (trig_in(16*0+15 downto 16*0) /= "0") and (FluxCounterEnable = '1') else '0';
-	Tagger16ORs(1) <= '1' when (trig_in(16*1+15 downto 16*1) /= "0") and (FluxCounterEnable = '1') else '0';
-	Tagger16ORs(2) <= '1' when (trig_in(16*2+15 downto 16*2) /= "0") and (FluxCounterEnable = '1') else '0';
-	Tagger16ORs(3) <= '1' when (trig_in(16*3+15 downto 16*3) /= "0") and (FluxCounterEnable = '1') else '0';
-	Tagger16ORs(4) <= '1' when (trig_in(16*0+15+3*32 downto 16*0+3*32) /= "0") and (FluxCounterEnable = '1') else '0';
-	Tagger16ORs(5) <= '1' when (trig_in(16*1+15+3*32 downto 16*1+3*32) /= "0") and (FluxCounterEnable = '1') else '0';
+	HelicityFluxCounterSignals: for i in 0 to 5 generate -- loop trough all TaggerORs
+		begin
+			Tagger16ORs(i) <= trig_in(24+i) when (FluxCounterEnable = '1') else '0';
 
-	--Helicity 0
-	AdditionalCountersOut_Intermediate(0) <= '1' when (Tagger16ORs(0) = '1') and (MAMIElectronSourceSetting(0) = '0') else '0';
-	AdditionalCountersOut_Intermediate(1) <= '1' when (Tagger16ORs(1) = '1') and (MAMIElectronSourceSetting(0) = '0') else '0';
-	AdditionalCountersOut_Intermediate(2) <= '1' when (Tagger16ORs(2) = '1') and (MAMIElectronSourceSetting(0) = '0') else '0';
-	AdditionalCountersOut_Intermediate(3) <= '1' when (Tagger16ORs(3) = '1') and (MAMIElectronSourceSetting(0) = '0') else '0';
-	AdditionalCountersOut_Intermediate(4) <= '1' when (Tagger16ORs(4) = '1') and (MAMIElectronSourceSetting(0) = '0') else '0';
-	AdditionalCountersOut_Intermediate(5) <= '1' when (Tagger16ORs(5) = '1') and (MAMIElectronSourceSetting(0) = '0') else '0';
-
-	--Helicity 1
-	AdditionalCountersOut_Intermediate(0+6) <= '1' when (Tagger16ORs(0) = '1') and (MAMIElectronSourceSetting(0) = '1') else '0';
-	AdditionalCountersOut_Intermediate(1+6) <= '1' when (Tagger16ORs(1) = '1') and (MAMIElectronSourceSetting(0) = '1') else '0';
-	AdditionalCountersOut_Intermediate(2+6) <= '1' when (Tagger16ORs(2) = '1') and (MAMIElectronSourceSetting(0) = '1') else '0';
-	AdditionalCountersOut_Intermediate(3+6) <= '1' when (Tagger16ORs(3) = '1') and (MAMIElectronSourceSetting(0) = '1') else '0';
-	AdditionalCountersOut_Intermediate(4+6) <= '1' when (Tagger16ORs(4) = '1') and (MAMIElectronSourceSetting(0) = '1') else '0';
-	AdditionalCountersOut_Intermediate(5+6) <= '1' when (Tagger16ORs(5) = '1') and (MAMIElectronSourceSetting(0) = '1') else '0';
-
---	Prescalers: for i in 0 to 12-1 generate -- loop trough all TDC channels
---		begin
---		Prescaler_0: Prescaler GENERIC MAP (Factor=>8) 
---			PORT MAP (clock=>clock200,Input=>AdditionalCountersOut_Intermediate(i),Output=>AdditionalCountersOut_Intermediate(i+12));
---	end generate;
-	AdditionalCountersOut_Intermediate(31 downto 12) <= (others => '0');
-
---	TaggerOR_SelectedCh_Heli1 <= '1' when (trig_in(31 downto 0) /= "0") and (FluxCounterEnable = '1') and 
---		(MAMIElectronSourceSetting(0) = '1') else '0';
---	Prescaler_0: Prescaler GENERIC MAP (Factor=>8) 
---		PORT MAP (clock=>clock200,Input=>AdditionalCountersOut_Intermediate(0),Output=>AdditionalCountersOut_Intermediate(2));
---	Prescaler_1: Prescaler GENERIC MAP (Factor=>8) 
---		PORT MAP (clock=>clock200,Input=>AdditionalCountersOut_Intermediate(1),Output=>AdditionalCountersOut_Intermediate(3));
-		
---	AdditionalCountersOut_Intermediate(0) <= TaggerOR_SelectedCh_Heli0;
---	AdditionalCountersOut_Intermediate(1) <= TaggerOR_SelectedCh_Heli1;
---	AdditionalCountersOut_Intermediate(5 downto 4) <= (others => '0');
-	AdditionalCountersOut <= AdditionalCountersOut_Intermediate;
---	trig_out(31 downto 31-5) <= AdditionalCountersOut_Intermediate;
-
---	process (clock200)
---	begin
---		if rising_edge(clock200) then
---			TaggerOR_SelectedCh_Heli0_Last0 <= TaggerOR_SelectedCh_Heli0;
---			TaggerOR_SelectedCh_Heli0_Last1 <= TaggerOR_SelectedCh_Heli0_Last0;
---			TaggerOR_SelectedCh_Heli1_Last0 <= TaggerOR_SelectedCh_Heli1;
---			TaggerOR_SelectedCh_Heli1_Last1 <= TaggerOR_SelectedCh_Heli1_Last0;
---		end if;
---	end process;
---	process (clock200)
---	begin
---		if rising_edge(clock200) then
---			if (TaggerOR_SelectedCh_Heli0_Last0 = '1') and (TaggerOR_SelectedCh_Heli0_Last1 = '0') then
---				TaggerOR_SelectedCh_Heli0_underdriven <= TaggerOR_SelectedCh_Heli0_underdriven +1;
---			end if;
---			if (TaggerOR_SelectedCh_Heli1_Last0 = '1') and (TaggerOR_SelectedCh_Heli1_Last1 = '0') then
---				TaggerOR_SelectedCh_Heli1_underdriven <= TaggerOR_SelectedCh_Heli1_underdriven +1;
---			end if;
---		end if;
---	end process;
-	
-	--AdditionalCountersOut_Intermediate(2) <= TaggerOR_SelectedCh_Heli0_underdriven(7);
-	--AdditionalCountersOut_Intermediate(3) <= TaggerOR_SelectedCh_Heli1_underdriven(7);
+			AdditionalCountersOut(i) <= '1'   when (Tagger16ORs(i) = '1') and (MAMIElectronSourceSetting(0) = '0') else '0'; --Helicity 0
+			AdditionalCountersOut(i+6) <= '1' when (Tagger16ORs(i) = '1') and (MAMIElectronSourceSetting(0) = '1') else '0'; --Helicity 1
+	end generate;	
 	---------------------------------------------------------------------------------
+
+	---------------------------------------------------------------------------------
+	-- DAQ Livetime Gate
+	---------------------------------------------------------------------------------
+	DAQ_LiveTime_Gate <= '1' when ((DAQ_State = WaitForAnyHit) or (DAQ_State = WaitAfterAnyHit1)) and (DAQ_Enabled = '1') else '0';
+	---------------------------------------------------------------------------------
+
 	
 	
 	CGenerateTDCs: for i in 0 to NumberOfTDCs-1 generate -- loop trough all TDC channels
@@ -644,37 +570,6 @@ begin
 		end if;
 	end process;
 	
-	LiveTimeCounters: process(clock100)
-	begin
-		if rising_edge(clock100) then
-			if (DAQ_State = FullReset0) then
-				DAQ_Counter_LiveTimeGated <= (others => '0');
-			elsif ((DAQ_State = WaitForAnyHit) or (DAQ_State = WaitAfterAnyHit1)) and (DAQ_Enabled = '1') then
-				DAQ_Counter_LiveTimeGated <= DAQ_Counter_LiveTimeGated + 1;
-			else
-				DAQ_Counter_LiveTimeGated <= DAQ_Counter_LiveTimeGated;
-			end if;
-			
-			--if (DAQ_State = FullReset0) then --these two lines are not used any longer
-			--	DAQ_Counter_LiveTime <= (others => '0');
-			if (DAQ_Enabled = '1') then
-				DAQ_Counter_LiveTime <= DAQ_Counter_LiveTime + 1;
-			else
-				DAQ_Counter_LiveTime <= DAQ_Counter_LiveTime;
-			end if;
-			
-			if (DAQ_Counter_Fix = '1') then
-				DAQ_Counter_LiveTimeGated_Fix <= DAQ_Counter_LiveTimeGated(39 downto 39-31);
-				DAQ_Counter_LiveTime_Fix <= DAQ_Counter_LiveTime(39 downto 39-31);
-			else
-				DAQ_Counter_LiveTimeGated_Fix <= DAQ_Counter_LiveTimeGated_Fix ;
-				DAQ_Counter_LiveTime_Fix <= DAQ_Counter_LiveTime_Fix;
-			end if;
-		end if;
-	end process;
-
-
-
 	DAQFSM_Next: process (DAQ_State, DAQ_Enabled, TDC_HitPresent)
 	begin
 		if (DAQ_State = RecoveryState) then
@@ -708,7 +603,7 @@ begin
 			DAQ_NextState <= FillHistogram3;
 		elsif (DAQ_State = FillHistogram3) then
 			DAQ_NextState <= WaitForAnyHit;
---			DAQ_NextState <= FillHistogram3; -- damit's stehen bleibt
+--			DAQ_NextState <= FillHistogram3; -- to make it stop here
 		else
 			DAQ_NextState <= FullReset0;
 		end if;
@@ -716,37 +611,6 @@ begin
 	------------------------------------------------------------------------------------------
 
 	
-	trig_out(1) <= TDC_HitPresent(0);
-	trig_out(2) <= Clock400GateEnable;
-	trig_out(3) <= TDCCountersClear;
-	trig_out(4) <= TDC_HitClear_InputClockBuffer;
-	trig_out(5) <= '1' when DAQ_State = FullReset0 else '0';
-	trig_out(6) <= '1' when DAQ_State = FullReset1 else '0';
-	trig_out(7) <= '1' when DAQ_State = FullReset2 else '0';
-	trig_out(8) <= '1' when DAQ_State = FullReset3 else '0';
-	trig_out(9) <= '1' when DAQ_State = WaitForAnyHit else '0';
-	trig_out(10) <= '1' when DAQ_State = WaitAfterAnyHit1 else '0';
-	trig_out(11) <= '1' when DAQ_State = ResetAndSave else '0';
-	trig_out(12) <= TDC_HitPresent(0);
-	trig_out(13) <= TDC_HitPresent(1);
-	trig_out(14) <= TDC_HitPresent(2);
-	trig_out(15) <= TDC_HitPresent(3);
-	trig_out(16) <= TDC_HitPresent(4);
-	trig_out(17) <= TDC_HitPresent(5);
-	trig_out(18) <= TDC_HitPresent(6);
-	trig_out(19) <= TDC_HitPresent(7);
-	trig_out(20) <= TDC_HitPresent(8);
-	trig_out(21) <= TDC_HitPresent(9);
-	trig_out(22) <= TDC_HitPresent(10);
-	trig_out(23) <= TDC_HitPresent(11);
-	trig_out(24) <= TDC_HitPresent(12);
-	trig_out(25) <= TDC_HitPresent(13);
-	trig_out(26) <= TDC_HitPresent(14);
-	trig_out(27) <= TDC_HitPresent(15);
-	trig_out(28) <= TDC_HitPresent(16);
-	trig_out(29) <= TDC_HitPresent(17);
-	trig_out(30) <= TDC_HitPresent(18);
-	trig_out(31) <= TDC_HitPresent(19);
 	
 	------------------------------------------------------------------------------------------
 	-- FSM RAM
@@ -807,63 +671,6 @@ begin
 	
 	
 	------------------------------------------------------------------------------------------
-
-	
-	--TaggerOR <= '1' when trig_in(63 downto 43) /= "0" else '0';
-	--nim_out <= MoellerTriggerSignal; --DAQ_Enabled;
-
-	nim_out <= TDCTrig_in(0) when DebugTrigIn = x"0000" else
-		TDCTrig_in(1) when DebugTrigIn = x"0001" else
-		TDCTrig_in(2) when DebugTrigIn = x"0002" else
-		TDCTrig_in(3) when DebugTrigIn = x"0003" else
-		TDCTrig_in(4) when DebugTrigIn = x"0004" else
-		TDCTrig_in(5) when DebugTrigIn = x"0005" else
-		TDCTrig_in(6) when DebugTrigIn = x"0006" else
-		TDCTrig_in(7) when DebugTrigIn = x"0007" else
-		TDCTrig_in(8) when DebugTrigIn = x"0008" else
-		TDCTrig_in(9) when DebugTrigIn = x"0009" else
-		TDCTrig_in(10) when DebugTrigIn = x"000A" else
-		TDCTrig_in(11) when DebugTrigIn = x"000B" else
-		TDCTrig_in(12) when DebugTrigIn = x"000C" else
-		TDCTrig_in(13) when DebugTrigIn = x"000D" else
-		TDCTrig_in(14) when DebugTrigIn = x"000E" else
-		TDCTrig_in(15) when DebugTrigIn = x"000F" else
-		TDCTrig_in(16) when DebugTrigIn = x"0010" else
-		TDCTrig_in(17) when DebugTrigIn = x"0011" else
-		TDCTrig_in(18) when DebugTrigIn = x"0012" else
-		TDCTrig_in(19) when DebugTrigIn = x"0013" else
-		TDCTrig_in(20) when DebugTrigIn = x"0014" else
-		TDCTrig_in(21) when DebugTrigIn = x"0015" else
-		TDCTrig_in(22) when DebugTrigIn = x"0016" else
-		TDCTrig_in(23) when DebugTrigIn = x"0017" else
-		TDC_HitPresent(0) when DebugTrigIn = x"0020" else
-		TDC_HitPresent(1) when DebugTrigIn = x"0021" else
-		TDC_HitPresent(2) when DebugTrigIn = x"0022" else
-		TDC_HitPresent(3) when DebugTrigIn = x"0023" else
-		TDC_HitPresent(4) when DebugTrigIn = x"0024" else
-		TDC_HitPresent(5) when DebugTrigIn = x"0025" else
-		TDC_HitPresent(6) when DebugTrigIn = x"0026" else
-		TDC_HitPresent(7) when DebugTrigIn = x"0027" else
-		TDC_HitPresent(8) when DebugTrigIn = x"0028" else
-		TDC_HitPresent(9) when DebugTrigIn = x"0029" else
-		TDC_HitPresent(10) when DebugTrigIn = x"002a" else
-		TDC_HitPresent(11) when DebugTrigIn = x"002b" else
-		TDC_HitPresent(12) when DebugTrigIn = x"002c" else
-		TDC_HitPresent(13) when DebugTrigIn = x"002d" else
-		TDC_HitPresent(14) when DebugTrigIn = x"002e" else
-		TDC_HitPresent(15) when DebugTrigIn = x"002f" else
-		TDC_HitPresent(16) when DebugTrigIn = x"0030" else
-		TDC_HitPresent(17) when DebugTrigIn = x"0031" else
-		TDC_HitPresent(18) when DebugTrigIn = x"0032" else
-		TDC_HitPresent(19) when DebugTrigIn = x"0033" else
-		TDC_HitPresent(20) when DebugTrigIn = x"0034" else
-		TDC_HitPresent(21) when DebugTrigIn = x"0035" else
-		TDC_HitPresent(22) when DebugTrigIn = x"0036" else
-		TDC_HitPresent(23) when DebugTrigIn = x"0037" else
-		MoellerTriggerSignal when DebugTrigIn = x"00FF" else
-		MAMIElectronSourceSetting(3) when DebugTrigIn = x"0100" else
-		'0';
-	
 	
 	
 	---------------------------------------------------------------------------------------------------------	
@@ -875,32 +682,27 @@ begin
 	begin
 		HistogramRAM_WEB <= '0'; -- schreiben auf den RAM disabled
 		if (clock50'event and clock50 ='1') then
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQ_Enabled) and (ckcsr = '1') then 
-				DAQ_Enabled <= u_dat_in(0); end if;
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQ_Reset) and (ckcsr = '1') then 
-				DAQ_Reset <= u_dat_in(0); end if;
-
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQ_Counter_Fix) and (ckcsr = '1') then 
-				DAQ_Counter_Fix <= u_dat_in(0); else DAQ_Counter_Fix <= '0'; end if;
-
---			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_WEB) and (ckcsr = '1') then 
---				HistogramRAM_WEB <= u_dat_in(0); end if;
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_AddrB) and (ckcsr = '1') then 
-				HistogramRAM_AddrB <= u_dat_in(8 downto 0); end if;
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_DInB) and (ckcsr = '1') then 
-				HistogramRAM_DInB <= u_dat_in; end if;
-
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_MAMIEnergySetting) and (ckcsr = '1') then 
-				MAMIEnergySetting <= u_dat_in(2 downto 0); end if;
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_InputChannelsDebugMode) and (ckcsr = '1') then 
-				InputChannelsDebugMode <= u_dat_in(0); end if;
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_InputChannelDebugLeftStart) and (ckcsr = '1') then 
-				InputChannelDebugLeftStart <= u_dat_in(7 downto 0); end if;
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_InputChannelDebugRightStart) and (ckcsr = '1') then 
-				InputChannelDebugRightStart <= u_dat_in(7 downto 0); end if;
-
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_DebugTrigIn) and (ckcsr = '1') then 
-				DebugTrigIn <= u_dat_in; end if;
+			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQ_Reset) and (ckcsr = '1') then 			DAQ_Reset <= u_dat_in(0); end if;
+--			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_WEB) and (ckcsr = '1') then 	HistogramRAM_WEB <= u_dat_in(0); end if;
+			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_AddrB) and (ckcsr = '1') then HistogramRAM_AddrB <= u_dat_in(8 downto 0); end if;
+			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_DInB) and (ckcsr = '1') then 	HistogramRAM_DInB <= u_dat_in; end if;
+			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQGateAllCards) and (ckcsr = '1') then 	DAQGateAllCards <= u_dat_in(0); end if;
+			
+			--Ch Selector
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart0) ) then 			ChSelectorMask(32*0+31 downto 32*0) <= u_dat_in; end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart1) ) then 			ChSelectorMask(32*1+31 downto 32*1) <= u_dat_in; end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart2) ) then 			ChSelectorMask(32*2+31 downto 32*2) <= u_dat_in; end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart3) ) then 			ChSelectorMask(32*3+31 downto 32*3) <= u_dat_in; end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart4) ) then 			ChSelectorMask(32*4+31 downto 32*4) <= u_dat_in; end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart5) ) then 			ChSelectorMask(32*5+31 downto 32*5) <= u_dat_in; end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart6) ) then 			ChSelectorMask(32*6+31 downto 32*6) <= u_dat_in; end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart7) ) then 			ChSelectorMask(32*7+31 downto 32*7) <= u_dat_in; end if;
+			
+			--debug
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_SelectedDebugInput_1) ) then 	SelectedDebugInput(8*1-1 downto 8*0) <= u_dat_in(7 downto 0); end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_SelectedDebugInput_2) ) then 	SelectedDebugInput(8*2-1 downto 8*1) <= u_dat_in(7 downto 0); end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_SelectedDebugInput_3) ) then 	SelectedDebugInput(8*3-1 downto 8*2) <= u_dat_in(7 downto 0); end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_SelectedDebugInput_4) ) then 	SelectedDebugInput(8*4-1 downto 8*3) <= u_dat_in(7 downto 0); end if;
 		end if;
 	end process;
 	
@@ -913,15 +715,11 @@ begin
 	begin
 		if (clock50'event and clock50 = '1' and oecsr = '1') then
 			u_data_o <= (others => '0');
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_WEB) then
-				u_data_o(0) <= HistogramRAM_WEB; end if;
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_AddrB) then
-				u_data_o(8 downto 0) <= HistogramRAM_AddrB; end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_HistogramRAM_DInB) then
-				u_data_o <= HistogramRAM_DInB; end if;
+			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_WEB) then 				u_data_o(0) <= HistogramRAM_WEB; end if;
+			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_AddrB) then 			u_data_o(8 downto 0) <= HistogramRAM_AddrB; end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_HistogramRAM_DInB) then				u_data_o <= HistogramRAM_DInB; end if;
 			-- Histogram 0 readout
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_HistogramRAM_DOutB0) then
-				u_data_o <= HistogramRAM_DOutB(0); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_HistogramRAM_DOutB0) then			u_data_o <= HistogramRAM_DOutB(0); end if;
 			-- Histogram 1..N readout
 			for k in 1 to NumberOfHistograms-1 loop
 				if ( u_ad_reg(11 downto 10) = BASE_TRIG_HistogramRAM_DOutB_Base(11 downto 10) ) and
@@ -939,35 +737,28 @@ begin
 				u_data_o(28-4) <= Clock400GateEnable;
 				u_data_o(28-2*4) <= TDCCountersClear; end if;
 				
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DAQ_Counter_LiveTime) then
-				u_data_o <= DAQ_Counter_LiveTime_Fix; end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DAQ_Counter_LiveTimeGated) then
-				u_data_o <= DAQ_Counter_LiveTimeGated_Fix;	 end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DAQ_Enabled) then 		u_data_o(0) <= DAQ_Enabled; end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DAQ_Reset) then 			u_data_o(0) <= DAQ_Reset; end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_FIXED) then 				u_data_o(31 downto 0) <= TRIG_FIXED; end if;
+			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQGateAllCards) then 	u_data_o(0) <= DAQGateAllCards; end if;
 			
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DAQ_Enabled) then
-				u_data_o(0) <= DAQ_Enabled; end if;
-				
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DAQ_Reset) then
-				u_data_o(0) <= DAQ_Reset; end if;
-				
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_VN2andVN1) then
-				u_data_o(7 downto 0) <= VN2andVN1; end if;
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_MAMIEnergySetting) then
-				u_data_o(2 downto 0) <= MAMIEnergySetting; end if;
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_InputChannelsDebugMode) then
-				u_data_o(0) <= InputChannelsDebugMode; end if;
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_InputChannelDebugLeftStart) then
-				u_data_o(7 downto 0) <= InputChannelDebugLeftStart; end if;
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_InputChannelDebugRightStart) then
-				u_data_o(7 downto 0) <= InputChannelDebugRightStart; end if;
-				
+			--Ch Selector
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart0) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*0+31 downto 32*0); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart1) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*1+31 downto 32*1); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart2) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*2+31 downto 32*2); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart3) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*3+31 downto 32*3); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart4) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*4+31 downto 32*4); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart5) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*5+31 downto 32*5); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart6) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*6+31 downto 32*6); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart7) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*7+31 downto 32*7); end if;
 
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_FIXED) then 
-				u_data_o(31 downto 0) <= TRIG_FIXED; end if;
+			--debug
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_1) then 	u_data_o(7 downto 0) <= SelectedDebugInput(8*1-1 downto 8*0); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_2) then 	u_data_o(7 downto 0) <= SelectedDebugInput(8*2-1 downto 8*1); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_3) then 	u_data_o(7 downto 0) <= SelectedDebugInput(8*3-1 downto 8*2); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_4) then 	u_data_o(7 downto 0) <= SelectedDebugInput(8*4-1 downto 8*3); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_Debug_ActualState) then 		u_data_o(NDebugSignalOutputs-1 downto 0) <= Debug_ActualState; end if;
 
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_DebugTrigIn) then 
-				u_data_o <= DebugTrigIn; end if;
-				
 		end if;
 	end process;
 
