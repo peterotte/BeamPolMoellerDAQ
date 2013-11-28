@@ -33,7 +33,7 @@ end trigger;
 
 architecture RTL of trigger is
 	constant FirmwareType: integer := 3;
-	constant FirmwareRevision: integer := 42;
+	constant FirmwareRevision: integer := 43;
 	signal TRIG_FIXED : std_logic_vector(31 downto 0); 
 
 	subtype sub_Address is std_logic_vector(11 downto 4);
@@ -43,7 +43,6 @@ architecture RTL of trigger is
 	
 	constant BASE_TRIG_DAQGateAllCards : sub_Address    					:= x"20"; -- r/w
 
-	constant BASE_TRIG_HistogramRAM_WEB : sub_Address    					:= x"c0"; -- r
 	constant BASE_TRIG_HistogramRAM_AddrB : sub_Address    				:= x"c1"; -- r/w
 	constant BASE_TRIG_HistogramRAM_DInB : sub_Address    				:= x"c2"; -- r/w
 	constant BASE_TRIG_HistogramRAM_DOutB0 : sub_Address    				:= x"80"; -- r
@@ -69,11 +68,10 @@ architecture RTL of trigger is
 
 	signal DAQGateAllCards : std_logic;
 	signal DAQ_Enabled : std_logic;
-	signal DAQ_Reset : std_logic;
+	signal DAQ_Reset, DAQ_Reset_6MuSec : std_logic := '0';
 	signal Clock400GateEnable : std_logic;
 
 	signal IncByOne : std_logic_vector(2 downto 0);
-	signal HistogramRAM_WEB : std_logic;
 	signal HistogramRAM_AddrB : std_logic_VECTOR(8 downto 0);
 	signal HistogramRAM_DInB : std_logic_VECTOR(31 downto 0);
 	
@@ -120,10 +118,9 @@ architecture RTL of trigger is
 		CompleteTimeDataSmall1 : in  STD_LOGIC_VECTOR (7 downto 0);
 		CompleteTimeDataSmall2 : in  STD_LOGIC_VECTOR (7 downto 0);
 		ClearEntireRAM : IN std_logic;
-		WriteEnabledB : IN std_logic;
 		DataInB : IN std_logic_vector(31 downto 0);
-		AddrB : IN std_logic_vector(8 downto 0);          
-		ClearCompleted : OUT std_logic;
+		AddrB : IN std_logic_vector(8 downto 0);       
+		AddrBForClear : IN STD_LOGIC_VECTOR (8 downto 0);
 		DataOutB : OUT std_logic_vector(31 downto 0)
 		);
 	END COMPONENT;
@@ -148,6 +145,29 @@ architecture RTL of trigger is
 	END COMPONENT;
 	signal MoellerTriggerSignal : std_logic;
 	signal LastMoeller_1, LastMoeller_0 : std_logic;
+   -------------------------------------------------------------------------
+	
+
+
+   -------------------------------------------------------------------------
+	-- Component need to clear the complete RAM
+   -------------------------------------------------------------------------
+	COMPONENT Input_Enlarger
+	Generic (
+		Width : integer := 600 -- should be greater then 2**9 * 10ns
+		);
+	PORT(
+		clock : IN std_logic;
+		input_signal : IN std_logic;          
+		output_signal : OUT std_logic
+		);
+	END COMPONENT;
+	
+	signal AddrBForClear : STD_LOGIC_VECTOR (8 downto 0);
+   -------------------------------------------------------------------------
+
+
+
 
 
 	------------------------------------------------------------------------------
@@ -331,6 +351,8 @@ begin
 	-------------------------------------------------------------------------------------------------
 	-- Debug Selector
 	DebugSignals(191 downto 0) <= trig_in;
+	DebugSignals(192) <= DAQ_Reset;
+	DebugSignals(193) <= DAQ_Reset_6MuSec;
 	DebugSignals(255) <= NIM_IN;
 	
 	DebugChSelectors: for i in 0 to NDebugSignalOutputs-1 generate
@@ -473,6 +495,21 @@ begin
 	------------------------------------------------------------------------------------------
 	-- Histograms
 	------------------------------------------------------------------------------------------
+	Inst_Input_Enlarger: Input_Enlarger PORT MAP(
+		clock => clock100, --same clock as ClockRAMB
+		input_signal => DAQ_Reset,
+		output_signal => DAQ_Reset_6MuSec
+	);
+	
+	process (clock100) --same clock as ClockRAMB
+	begin
+		if rising_edge(clock100) then
+			AddrBForClear <= AddrBForClear + 1;
+		end if;
+	end process;
+
+
+	
 	Inst_SingleHistogram_RAM_0: SingleHistogram_RAM 
 		GENERIC MAP (DebugDetermineShiftFineDataBy => 1)
 		PORT MAP(
@@ -485,11 +522,10 @@ begin
 		HitPattern2 => TDC_HitPresent(1),
 		CompleteTimeDataSmall1 => CompleteTimeDataSmall(0),
 		CompleteTimeDataSmall2 => CompleteTimeDataSmall(1),
-		ClearEntireRAM => DAQ_Reset,
-		ClearCompleted => open,
-		WriteEnabledB => HistogramRAM_WEB,
+		ClearEntireRAM => DAQ_Reset_6MuSec,
 		DataInB => HistogramRAM_DInB,
 		AddrB => HistogramRAM_AddrB,
+		AddrBForClear => AddrBForClear,
 		DataOutB => HistogramRAM_DOutB(0)
 	);
 	Ccomb: for k in 0 to NumberOfLeftChannels-1 generate -- loop through left channels
@@ -508,11 +544,10 @@ begin
 				HitPattern2 => TDC_HitPresent(MoellerPairsTDCCh(k,1)+i),
 				CompleteTimeDataSmall1 => CompleteTimeDataSmall(MoellerPairsTDCCh(k,0)),
 				CompleteTimeDataSmall2 => CompleteTimeDataSmall(MoellerPairsTDCCh(k,1)+i),
-				ClearEntireRAM => DAQ_Reset,
-				ClearCompleted => open,
-				WriteEnabledB => HistogramRAM_WEB,
+				ClearEntireRAM => DAQ_Reset_6MuSec,
 				DataInB => HistogramRAM_DInB,
 				AddrB => HistogramRAM_AddrB,
+				AddrBForClear => AddrBForClear,
 				DataOutB => HistogramRAM_DOutB( k*NumberOfPairsPerLeftCh+i+1)
 			);
 		end generate;
@@ -523,10 +558,10 @@ begin
 	------------------------------------------------------------------------------------------
 	-- FSM DAQ
 	------------------------------------------------------------------------------------------
-	DAQFSM_State: process (clock50, DAQ_Reset)
+	DAQFSM_State: process (clock50)
 	begin
 		if rising_edge(clock50) then
-			if (DAQ_Reset = '1') then
+			if (DAQ_Reset_6MuSec = '1') then
 				DAQ_State <= FullReset0;
 			else
 				DAQ_State <= DAQ_NextState;
@@ -680,10 +715,9 @@ begin
 	---------------------------------------------------------------------------------------------------------	
 	process(clock50, ckcsr, u_ad_reg)
 	begin
-		HistogramRAM_WEB <= '0'; -- schreiben auf den RAM disabled
 		if (clock50'event and clock50 ='1') then
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQ_Reset) and (ckcsr = '1') then 			DAQ_Reset <= u_dat_in(0); end if;
---			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_WEB) and (ckcsr = '1') then 	HistogramRAM_WEB <= u_dat_in(0); end if;
+			DAQ_Reset <= '0';
+			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQ_Reset) and (ckcsr = '1') then 			DAQ_Reset <= '1'; end if;
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_AddrB) and (ckcsr = '1') then HistogramRAM_AddrB <= u_dat_in(8 downto 0); end if;
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_DInB) and (ckcsr = '1') then 	HistogramRAM_DInB <= u_dat_in; end if;
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQGateAllCards) and (ckcsr = '1') then 	DAQGateAllCards <= u_dat_in(0); end if;
@@ -715,7 +749,6 @@ begin
 	begin
 		if (clock50'event and clock50 = '1' and oecsr = '1') then
 			u_data_o <= (others => '0');
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_WEB) then 				u_data_o(0) <= HistogramRAM_WEB; end if;
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_AddrB) then 			u_data_o(8 downto 0) <= HistogramRAM_AddrB; end if;
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_HistogramRAM_DInB) then				u_data_o <= HistogramRAM_DInB; end if;
 			-- Histogram 0 readout
@@ -738,7 +771,7 @@ begin
 				u_data_o(28-2*4) <= TDCCountersClear; end if;
 				
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DAQ_Enabled) then 		u_data_o(0) <= DAQ_Enabled; end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DAQ_Reset) then 			u_data_o(0) <= DAQ_Reset; end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DAQ_Reset) then 			u_data_o(0) <= DAQ_Reset_6MuSec; end if;
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_FIXED) then 				u_data_o(31 downto 0) <= TRIG_FIXED; end if;
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQGateAllCards) then 	u_data_o(0) <= DAQGateAllCards; end if;
 			

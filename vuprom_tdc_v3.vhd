@@ -299,6 +299,7 @@ architecture rtl of vuprom_MoellerDAQ is
 
 
 
+	signal LiveTimeCounterOpen, LiveTimeCounterGated : std_logic_vector(7 downto 0);
 
 
 ------------------------------------------------------------------------------------------
@@ -513,8 +514,21 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 
 
 -- scaler i/o
-	AdditionalCountersOut(31) <= clk1 when DAQ_LiveTime_Gate = '1' else '0';
-	AdditionalCountersOut(30) <= clk1 when DAQ_Enabled_Out = '1' else '0';
+
+	process (clk50)
+	begin
+		if rising_edge(clk50) then
+			if DAQ_Enabled_Out = '1' then
+				LiveTimeCounterOpen <= LiveTimeCounterOpen + 1;
+			end if;
+			if DAQ_LiveTime_Gate = '1' then
+				LiveTimeCounterGated <= LiveTimeCounterGated + 1;
+			end if;
+		end if;
+	end process;
+
+	AdditionalCountersOut(31) <= LiveTimeCounterGated(7); --clk1 when DAQ_LiveTime_Gate = '1' else '0';
+	AdditionalCountersOut(30) <= LiveTimeCounterOpen(7); --clk1 when DAQ_Enabled_Out = '1' else '0';
 	scal_in <= AdditionalCountersOut & PGIO3X ( 32 downto 1) & IN1X (32 downto 1); --PGIO3X ( 32 downto 1) &
 	
 	

@@ -17,10 +17,9 @@ entity SingleHistogram_RAM is
 				CompleteTimeDataSmall1 : in  STD_LOGIC_VECTOR (7 downto 0);
 				CompleteTimeDataSmall2 : in  STD_LOGIC_VECTOR (7 downto 0);
 				ClearEntireRAM : in  STD_LOGIC;
-				ClearCompleted : out  STD_LOGIC;
-				WriteEnabledB : in  STD_LOGIC;
 				DataInB : in  STD_LOGIC_VECTOR (31 downto 0);
 				AddrB : in  STD_LOGIC_VECTOR (8 downto 0);
+				AddrBForClear : IN STD_LOGIC_VECTOR (8 downto 0);
 				DataOutB : out  STD_LOGIC_VECTOR (31 downto 0));
 end SingleHistogram_RAM;
 
@@ -44,7 +43,7 @@ architecture Behavioral of SingleHistogram_RAM is
 	attribute syn_black_box of Histogram_RAM: component is true;
 
 	signal Temp_HistogramValueForInc : std_logic_vector(31 downto 0);
-	signal Temp_WriteEnabledB : std_logic_vector(0 downto 0);
+	signal Temp_WriteEnabledA, Temp_WriteEnabledB : std_logic_vector(0 downto 0);
 	
 	signal HistogramRAM_DInA : std_logic_vector(31 downto 0);
 	signal HistogramRAM_DOutA : std_logic_vector(31 downto 0);
@@ -52,6 +51,10 @@ architecture Behavioral of SingleHistogram_RAM is
 	
 	signal TDCDifference21 : std_logic_vector(7 downto 0);
 	signal InterHitPattern : std_logic_vector(1 downto 0);
+	
+	signal Inter_DataInB : STD_LOGIC_VECTOR (31 downto 0);
+	signal Inter_AddrB : std_logic_vector(8 downto 0);
+	
 begin
 	DebugCondiditionNormal: if DebugDetermineShiftFineDataBy = 0 generate
 		-- This division operation takes ~10ns time, or a bit more
@@ -70,21 +73,25 @@ begin
 		
 	-- HistogramPage respects the actual setting of the MAMI electron source
 	HistogramRAM_AddrA <= HistogramPage&TDCDifference21;
+	
+	Inter_DataInB <= DataInB when ClearEntireRAM = '0' else (31 downto 0=>'0');
+	Inter_AddrB <= AddrB when ClearEntireRAM = '0' else AddrBForClear;
+	Temp_WriteEnabledA(0) <= IncByOne(2) when ClearEntireRAM = '0' else '0';
+	Temp_WriteEnabledB(0) <= ClearEntireRAM;
 
 	Inst_Histogram_RAM : Histogram_RAM
 		port map (
 			clka => ClockRAM,
-			wea => IncByOne(2 downto 2),
+			wea => Temp_WriteEnabledA,
 			addra => HistogramRAM_AddrA,
 			dina => HistogramRAM_DInA,
 			douta => HistogramRAM_DOutA,
 			clkb => ClockRAMB,
 			web => Temp_WriteEnabledB,
-			addrb => AddrB,
-			dinb => DataInB,
+			addrb => Inter_AddrB,
+			dinb => Inter_DataInB,
 			doutb => DataOutB);
 		
-	Temp_WriteEnabledB(0) <= WriteEnabledB;
 	
 	process(Clock)
 	begin
