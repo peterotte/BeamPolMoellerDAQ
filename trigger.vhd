@@ -33,7 +33,7 @@ end trigger;
 
 architecture RTL of trigger is
 	constant FirmwareType: integer := 3;
-	constant FirmwareRevision: integer := 43;
+	constant FirmwareRevision: integer := 45;
 	signal TRIG_FIXED : std_logic_vector(31 downto 0); 
 
 	subtype sub_Address is std_logic_vector(11 downto 4);
@@ -45,17 +45,17 @@ architecture RTL of trigger is
 
 	constant BASE_TRIG_HistogramRAM_AddrB : sub_Address    				:= x"c1"; -- r/w
 	constant BASE_TRIG_HistogramRAM_DInB : sub_Address    				:= x"c2"; -- r/w
-	constant BASE_TRIG_HistogramRAM_DOutB0 : sub_Address    				:= x"80"; -- r
-	constant BASE_TRIG_HistogramRAM_DOutB_Base : sub_Address      		:= x"81"; -- r
+	constant BASE_TRIG_HistogramRAM_DOutB0 : sub_Address    				:= x"80"; -- r --only top 2 bits are used
+	constant BASE_TRIG_HistogramRAM_DOutB_Base : sub_Address      		:= x"81"; -- r --only top 2 bits are used
 
-	constant BASE_TRIG_ChSelectorPart0 : sub_Address      				:= x"60"; -- r/w
-	constant BASE_TRIG_ChSelectorPart1 : sub_Address      				:= x"61"; -- r/w
-	constant BASE_TRIG_ChSelectorPart2 : sub_Address      				:= x"62"; -- r/w
-	constant BASE_TRIG_ChSelectorPart3 : sub_Address      				:= x"63"; -- r/w
-	constant BASE_TRIG_ChSelectorPart4 : sub_Address      				:= x"64"; -- r/w
-	constant BASE_TRIG_ChSelectorPart5 : sub_Address      				:= x"65"; -- r/w
-	constant BASE_TRIG_ChSelectorPart6 : sub_Address      				:= x"66"; -- r/w
-	constant BASE_TRIG_ChSelectorPart7 : sub_Address      				:= x"67"; -- r/w
+	constant BASE_TRIG_ChSelectorPart0 : sub_Address      				:= x"10"; -- r/w
+	constant BASE_TRIG_ChSelectorPart1 : sub_Address      				:= x"11"; -- r/w
+	constant BASE_TRIG_ChSelectorPart2 : sub_Address      				:= x"12"; -- r/w
+	constant BASE_TRIG_ChSelectorPart3 : sub_Address      				:= x"13"; -- r/w
+	constant BASE_TRIG_ChSelectorPart4 : sub_Address      				:= x"14"; -- r/w
+	constant BASE_TRIG_ChSelectorPart5 : sub_Address      				:= x"15"; -- r/w
+	constant BASE_TRIG_ChSelectorPart6 : sub_Address      				:= x"16"; -- r/w
+	constant BASE_TRIG_ChSelectorPart7 : sub_Address      				:= x"17"; -- r/w
 
 	--debug
 	constant BASE_TRIG_Debug_ActualState : sub_Address							:= x"e0"; --r
@@ -495,7 +495,9 @@ begin
 	------------------------------------------------------------------------------------------
 	-- Histograms
 	------------------------------------------------------------------------------------------
-	Inst_Input_Enlarger: Input_Enlarger PORT MAP(
+	Inst_Input_Enlarger: Input_Enlarger GENERIC MAP(
+		Width => 600
+	) PORT MAP(
 		clock => clock100, --same clock as ClockRAMB
 		input_signal => DAQ_Reset,
 		output_signal => DAQ_Reset_6MuSec
@@ -509,7 +511,7 @@ begin
 	end process;
 
 
-	
+	-- The following instance is used for debug or calibration cases
 	Inst_SingleHistogram_RAM_0: SingleHistogram_RAM 
 		GENERIC MAP (DebugDetermineShiftFineDataBy => 1)
 		PORT MAP(
@@ -528,6 +530,8 @@ begin
 		AddrBForClear => AddrBForClear,
 		DataOutB => HistogramRAM_DOutB(0)
 	);
+	
+	-- These are the histograms used for the physical measurement
 	Ccomb: for k in 0 to NumberOfLeftChannels-1 generate -- loop through left channels
 		begin
 		Ccomb2: for i in 0 to NumberOfPairsPerLeftCh-1 generate -- loop trough right channels
@@ -717,7 +721,7 @@ begin
 	begin
 		if (clock50'event and clock50 ='1') then
 			DAQ_Reset <= '0';
-			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQ_Reset) and (ckcsr = '1') then 			DAQ_Reset <= '1'; end if;
+			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQ_Reset) and (ckcsr = '1') then 			DAQ_Reset <= u_dat_in(0); end if;
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_AddrB) and (ckcsr = '1') then HistogramRAM_AddrB <= u_dat_in(8 downto 0); end if;
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_DInB) and (ckcsr = '1') then 	HistogramRAM_DInB <= u_dat_in; end if;
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQGateAllCards) and (ckcsr = '1') then 	DAQGateAllCards <= u_dat_in(0); end if;
