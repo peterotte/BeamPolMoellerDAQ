@@ -33,7 +33,7 @@ end trigger;
 
 architecture RTL of trigger is
 	constant FirmwareType: integer := 3;
-	constant FirmwareRevision: integer := 45;
+	constant FirmwareRevision: integer := 46;
 	signal TRIG_FIXED : std_logic_vector(31 downto 0); 
 
 	subtype sub_Address is std_logic_vector(11 downto 4);
@@ -42,7 +42,8 @@ architecture RTL of trigger is
 	constant BASE_TRIG_DAQ_Enabled : sub_Address   							:= x"04"; -- r
 	
 	constant BASE_TRIG_DAQGateAllCards : sub_Address    					:= x"20"; -- r/w
-
+	constant BASE_TRIG_NIMOUT_Mode : sub_Address    						:= x"21"; -- r/w Set to 0=normal, 1=SelectedTaggerCh AllOR
+	
 	constant BASE_TRIG_HistogramRAM_AddrB : sub_Address    				:= x"c1"; -- r/w
 	constant BASE_TRIG_HistogramRAM_DInB : sub_Address    				:= x"c2"; -- r/w
 	constant BASE_TRIG_HistogramRAM_DOutB0 : sub_Address    				:= x"80"; -- r --only top 2 bits are used
@@ -66,7 +67,8 @@ architecture RTL of trigger is
 	
 	signal ChSelectorMask : std_logic_vector(32*8-1 downto 0) := (others => '0');
 
-	signal DAQGateAllCards : std_logic;
+	signal DAQGateAllCards : std_logic := '0';
+	signal NIMOUT_Mode : std_logic := '0';
 	signal DAQ_Enabled : std_logic;
 	signal DAQ_Reset, DAQ_Reset_6MuSec : std_logic := '0';
 	signal Clock400GateEnable : std_logic;
@@ -343,6 +345,7 @@ architecture RTL of trigger is
 	signal SelectedTaggerCh : std_logic_vector(31 downto 0);
 	---------------------------------------------------------------------------------
 
+	Signal SelectedTaggerCh_ALLOR : std_logic;
 begin
 	TRIG_FIXED(31 downto 24) <= CONV_STD_LOGIC_VECTOR(FirmwareType, 8);
 	TRIG_FIXED(23 downto 16) <= CONV_STD_LOGIC_VECTOR(0, 8);
@@ -373,6 +376,8 @@ begin
 		SelectedTaggerCh(16+i) <= '1' when (ChSelectorMask(7+(i+16)*8 downto 0+(i+16)*8) and PairSpecModulesCombined) /= "0" else '0';
 		SelectedTaggerCh(24+i) <= '1' when (ChSelectorMask(7+(i+24)*8 downto 0+(i+24)*8) and PairSpecModulesCombined) /= "0" else '0';
 	end generate;
+	SelectedTaggerCh_ALLOR <= '1' when SelectedTaggerCh /= "0" else '0';
+	DebugSignals(254)<= SelectedTaggerCh_ALLOR;
 	
 	--signals to exp trigger via out1
 	trig_out(27 downto 0) <= SelectedTaggerCh(27 downto 0);
@@ -435,7 +440,9 @@ begin
 	------------------------------------------------------------------------------------------
 	InputChannelDebugLeftGroup <= trig_in(0+NumberOfLeftChannels-1 downto 0);
 	InputChannelDebugRightGroup <= trig_in(0+NumberOfTDCs-1 downto NumberOfLeftChannels);
-	NIM_OUT <= DAQGateAllCards; --send to NIM OUT and then to all other VUPROMs via NIM IN
+		-- if NIMOUT_mode = '0' then normal DAQ_Enable signal
+		-- if NIMOUT_mode = '1' then SelectedTaggerCh_ALLOR
+	NIM_OUT <= DAQGateAllCards when NIMOUT_Mode='0' else SelectedTaggerCh_ALLOR; --send to NIM OUT and then to all other VUPROMs via NIM IN
 
 	DAQ_Enabled <= NIM_IN;
 	DAQ_Enabled_out <= DAQ_Enabled;
@@ -725,6 +732,7 @@ begin
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_AddrB) and (ckcsr = '1') then HistogramRAM_AddrB <= u_dat_in(8 downto 0); end if;
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_HistogramRAM_DInB) and (ckcsr = '1') then 	HistogramRAM_DInB <= u_dat_in; end if;
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQGateAllCards) and (ckcsr = '1') then 	DAQGateAllCards <= u_dat_in(0); end if;
+			if (u_ad_reg(11 downto 4) = BASE_TRIG_NIMOUT_Mode) and (ckcsr = '1') then 			NIMOUT_Mode <= u_dat_in(0); end if;
 			
 			--Ch Selector
 			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart0) ) then 			ChSelectorMask(32*0+31 downto 32*0) <= u_dat_in; end if;
@@ -778,6 +786,7 @@ begin
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DAQ_Reset) then 			u_data_o(0) <= DAQ_Reset_6MuSec; end if;
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_FIXED) then 				u_data_o(31 downto 0) <= TRIG_FIXED; end if;
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_DAQGateAllCards) then 	u_data_o(0) <= DAQGateAllCards; end if;
+			if (u_ad_reg(11 downto 4) = BASE_TRIG_NIMOUT_Mode) then 			u_data_o(0) <= NIMOUT_Mode; end if;
 			
 			--Ch Selector
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart0) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*0+31 downto 32*0); end if;
