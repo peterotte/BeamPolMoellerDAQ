@@ -33,7 +33,7 @@ end trigger;
 
 architecture RTL of trigger is
 	constant FirmwareType: integer := 3;
-	constant FirmwareRevision: integer := 46;
+	constant FirmwareRevision: integer := 48;
 	signal TRIG_FIXED : std_logic_vector(31 downto 0); 
 
 	subtype sub_Address is std_logic_vector(11 downto 4);
@@ -41,22 +41,47 @@ architecture RTL of trigger is
 	constant BASE_TRIG_DAQ_Reset : sub_Address   							:= x"03"; -- r/w
 	constant BASE_TRIG_DAQ_Enabled : sub_Address   							:= x"04"; -- r
 	
-	constant BASE_TRIG_DAQGateAllCards : sub_Address    					:= x"20"; -- r/w
-	constant BASE_TRIG_NIMOUT_Mode : sub_Address    						:= x"21"; -- r/w Set to 0=normal, 1=SelectedTaggerCh AllOR
+	constant BASE_TRIG_DAQGateAllCards : sub_Address    					:= x"50"; -- r/w
+	constant BASE_TRIG_NIMOUT_Mode : sub_Address    						:= x"51"; -- r/w Set to 0=normal, 1=SelectedTaggerCh AllOR
 	
 	constant BASE_TRIG_HistogramRAM_AddrB : sub_Address    				:= x"c1"; -- r/w
 	constant BASE_TRIG_HistogramRAM_DInB : sub_Address    				:= x"c2"; -- r/w
 	constant BASE_TRIG_HistogramRAM_DOutB0 : sub_Address    				:= x"80"; -- r --only top 2 bits are used
 	constant BASE_TRIG_HistogramRAM_DOutB_Base : sub_Address      		:= x"81"; -- r --only top 2 bits are used
 
-	constant BASE_TRIG_ChSelectorPart0 : sub_Address      				:= x"10"; -- r/w
-	constant BASE_TRIG_ChSelectorPart1 : sub_Address      				:= x"11"; -- r/w
-	constant BASE_TRIG_ChSelectorPart2 : sub_Address      				:= x"12"; -- r/w
-	constant BASE_TRIG_ChSelectorPart3 : sub_Address      				:= x"13"; -- r/w
-	constant BASE_TRIG_ChSelectorPart4 : sub_Address      				:= x"14"; -- r/w
-	constant BASE_TRIG_ChSelectorPart5 : sub_Address      				:= x"15"; -- r/w
-	constant BASE_TRIG_ChSelectorPart6 : sub_Address      				:= x"16"; -- r/w
-	constant BASE_TRIG_ChSelectorPart7 : sub_Address      				:= x"17"; -- r/w
+	constant BASE_TRIG_ChSelectorPart0_0 : sub_Address          := x"10"; 	 constant BASE_TRIG_ChSelectorPart0_1 : sub_Address          := x"11"; 
+	constant BASE_TRIG_ChSelectorPart1_0 : sub_Address          := x"12"; 	 constant BASE_TRIG_ChSelectorPart1_1 : sub_Address          := x"13"; 
+	constant BASE_TRIG_ChSelectorPart2_0 : sub_Address          := x"14"; 	 constant BASE_TRIG_ChSelectorPart2_1 : sub_Address          := x"15"; 
+	constant BASE_TRIG_ChSelectorPart3_0 : sub_Address          := x"16"; 	 constant BASE_TRIG_ChSelectorPart3_1 : sub_Address          := x"17"; 
+	constant BASE_TRIG_ChSelectorPart4_0 : sub_Address          := x"18"; 	 constant BASE_TRIG_ChSelectorPart4_1 : sub_Address          := x"19"; 
+	constant BASE_TRIG_ChSelectorPart5_0 : sub_Address          := x"1A"; 	 constant BASE_TRIG_ChSelectorPart5_1 : sub_Address          := x"1B"; 
+	constant BASE_TRIG_ChSelectorPart6_0 : sub_Address          := x"1C"; 	 constant BASE_TRIG_ChSelectorPart6_1 : sub_Address          := x"1D"; 
+	constant BASE_TRIG_ChSelectorPart7_0 : sub_Address          := x"1E"; 	 constant BASE_TRIG_ChSelectorPart7_1 : sub_Address          := x"1F"; 
+	constant BASE_TRIG_ChSelectorPart8_0 : sub_Address          := x"20"; 	 constant BASE_TRIG_ChSelectorPart8_1 : sub_Address          := x"21"; 
+	constant BASE_TRIG_ChSelectorPart9_0 : sub_Address          := x"22"; 	 constant BASE_TRIG_ChSelectorPart9_1 : sub_Address          := x"23"; 
+	constant BASE_TRIG_ChSelectorPart10_0 : sub_Address          := x"24"; 	 constant BASE_TRIG_ChSelectorPart10_1 : sub_Address          := x"25"; 
+	constant BASE_TRIG_ChSelectorPart11_0 : sub_Address          := x"26"; 	 constant BASE_TRIG_ChSelectorPart11_1 : sub_Address          := x"27"; 
+	constant BASE_TRIG_ChSelectorPart12_0 : sub_Address          := x"28"; 	 constant BASE_TRIG_ChSelectorPart12_1 : sub_Address          := x"29"; 
+	constant BASE_TRIG_ChSelectorPart13_0 : sub_Address          := x"2A"; 	 constant BASE_TRIG_ChSelectorPart13_1 : sub_Address          := x"2B"; 
+	constant BASE_TRIG_ChSelectorPart14_0 : sub_Address          := x"2C"; 	 constant BASE_TRIG_ChSelectorPart14_1 : sub_Address          := x"2D"; 
+	constant BASE_TRIG_ChSelectorPart15_0 : sub_Address          := x"2E"; 	 constant BASE_TRIG_ChSelectorPart15_1 : sub_Address          := x"2F"; 
+	constant BASE_TRIG_ChSelectorPart16_0 : sub_Address          := x"30"; 	 constant BASE_TRIG_ChSelectorPart16_1 : sub_Address          := x"31"; 
+	constant BASE_TRIG_ChSelectorPart17_0 : sub_Address          := x"32"; 	 constant BASE_TRIG_ChSelectorPart17_1 : sub_Address          := x"33"; 
+	constant BASE_TRIG_ChSelectorPart18_0 : sub_Address          := x"34"; 	 constant BASE_TRIG_ChSelectorPart18_1 : sub_Address          := x"35"; 
+	constant BASE_TRIG_ChSelectorPart19_0 : sub_Address          := x"36"; 	 constant BASE_TRIG_ChSelectorPart19_1 : sub_Address          := x"37"; 
+	constant BASE_TRIG_ChSelectorPart20_0 : sub_Address          := x"38"; 	 constant BASE_TRIG_ChSelectorPart20_1 : sub_Address          := x"39"; 
+	constant BASE_TRIG_ChSelectorPart21_0 : sub_Address          := x"3A"; 	 constant BASE_TRIG_ChSelectorPart21_1 : sub_Address          := x"3B"; 
+	constant BASE_TRIG_ChSelectorPart22_0 : sub_Address          := x"3C"; 	 constant BASE_TRIG_ChSelectorPart22_1 : sub_Address          := x"3D"; 
+	constant BASE_TRIG_ChSelectorPart23_0 : sub_Address          := x"3E"; 	 constant BASE_TRIG_ChSelectorPart23_1 : sub_Address          := x"3F"; 
+	constant BASE_TRIG_ChSelectorPart24_0 : sub_Address          := x"40"; 	 constant BASE_TRIG_ChSelectorPart24_1 : sub_Address          := x"41"; 
+	constant BASE_TRIG_ChSelectorPart25_0 : sub_Address          := x"42"; 	 constant BASE_TRIG_ChSelectorPart25_1 : sub_Address          := x"43"; 
+	constant BASE_TRIG_ChSelectorPart26_0 : sub_Address          := x"44"; 	 constant BASE_TRIG_ChSelectorPart26_1 : sub_Address          := x"45"; 
+	constant BASE_TRIG_ChSelectorPart27_0 : sub_Address          := x"46"; 	 constant BASE_TRIG_ChSelectorPart27_1 : sub_Address          := x"47"; 
+	constant BASE_TRIG_ChSelectorPart28_0 : sub_Address          := x"48"; 	 constant BASE_TRIG_ChSelectorPart28_1 : sub_Address          := x"49"; 
+	constant BASE_TRIG_ChSelectorPart29_0 : sub_Address          := x"4A"; 	 constant BASE_TRIG_ChSelectorPart29_1 : sub_Address          := x"4B"; 
+	constant BASE_TRIG_ChSelectorPart30_0 : sub_Address          := x"4C"; 	 constant BASE_TRIG_ChSelectorPart30_1 : sub_Address          := x"4D"; 
+	constant BASE_TRIG_ChSelectorPart31_0 : sub_Address          := x"4E"; 	 constant BASE_TRIG_ChSelectorPart31_1 : sub_Address          := x"4F"; 
+
 
 	--debug
 	constant BASE_TRIG_Debug_ActualState : sub_Address							:= x"e0"; --r
@@ -65,7 +90,7 @@ architecture RTL of trigger is
 	constant BASE_TRIG_SelectedDebugInput_3 : sub_Address						:= x"e3"; --r/w
 	constant BASE_TRIG_SelectedDebugInput_4 : sub_Address						:= x"e4"; --r/w
 	
-	signal ChSelectorMask : std_logic_vector(32*8-1 downto 0) := (others => '0');
+	signal ChSelectorMask : std_logic_vector(32*64-1 downto 0) := (others => '0');
 
 	signal DAQGateAllCards : std_logic := '0';
 	signal NIMOUT_Mode : std_logic := '0';
@@ -341,7 +366,7 @@ architecture RTL of trigger is
 	---------------------------------------------------------------------------------
 	-- Tagger Ch Selector Signals
 	signal PairSpecModule1, PairSpecModule2, PairSpecModule3, PairSpecModule4 : std_logic_vector(15 downto 0);
-	signal PairSpecModulesCombined : std_logic_vector(7 downto 0);
+	signal PairSpecModulesCombined : std_logic_vector(63 downto 0);
 	signal SelectedTaggerCh : std_logic_vector(31 downto 0);
 	---------------------------------------------------------------------------------
 
@@ -368,13 +393,15 @@ begin
 	end generate;
 	-------------------------------------------------------------------------------------------------
 
-	SelectedTaggerChs: for i in 0 to 7 generate
+	PairSpecModule1 <= trig_in(32*1+15 downto 32*1); --IN2
+	PairSpecModule2 <= trig_in(32*2+15 downto 32*2); --IN3
+	PairSpecModule3 <= trig_in(32*3+15 downto 32*3); --IO1
+	PairSpecModule4 <= trig_in(32*4+15 downto 32*4); --IO2
+	PairSpecModulesCombined <= PairSpecModule4&PairSpecModule3&PairSpecModule2&PairSpecModule1;
+	
+	SelectedTaggerChs: for i in 0 to 31 generate
 	begin
-		PairSpecModulesCombined <= PairSpecModule4(8)&PairSpecModule4(0)&PairSpecModule3(8)&PairSpecModule3(0)&PairSpecModule2(8)&PairSpecModule2(0)&PairSpecModule1(8)&PairSpecModule1(0);
-		SelectedTaggerCh(0+i)  <= '1' when (ChSelectorMask(7+(i+0 )*8 downto 0+(i+0 )*8) and PairSpecModulesCombined) /= "0" else '0';
-		SelectedTaggerCh(8+i)  <= '1' when (ChSelectorMask(7+(i+8 )*8 downto 0+(i+8 )*8) and PairSpecModulesCombined) /= "0" else '0';
-		SelectedTaggerCh(16+i) <= '1' when (ChSelectorMask(7+(i+16)*8 downto 0+(i+16)*8) and PairSpecModulesCombined) /= "0" else '0';
-		SelectedTaggerCh(24+i) <= '1' when (ChSelectorMask(7+(i+24)*8 downto 0+(i+24)*8) and PairSpecModulesCombined) /= "0" else '0';
+		SelectedTaggerCh(i)  <= '1' when (ChSelectorMask(63+i*64 downto i*64) and PairSpecModulesCombined) /= "0" else '0';
 	end generate;
 	SelectedTaggerCh_ALLOR <= '1' when SelectedTaggerCh /= "0" else '0';
 	DebugSignals(254)<= SelectedTaggerCh_ALLOR;
@@ -735,14 +762,38 @@ begin
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_NIMOUT_Mode) and (ckcsr = '1') then 			NIMOUT_Mode <= u_dat_in(0); end if;
 			
 			--Ch Selector
-			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart0) ) then 			ChSelectorMask(32*0+31 downto 32*0) <= u_dat_in; end if;
-			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart1) ) then 			ChSelectorMask(32*1+31 downto 32*1) <= u_dat_in; end if;
-			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart2) ) then 			ChSelectorMask(32*2+31 downto 32*2) <= u_dat_in; end if;
-			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart3) ) then 			ChSelectorMask(32*3+31 downto 32*3) <= u_dat_in; end if;
-			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart4) ) then 			ChSelectorMask(32*4+31 downto 32*4) <= u_dat_in; end if;
-			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart5) ) then 			ChSelectorMask(32*5+31 downto 32*5) <= u_dat_in; end if;
-			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart6) ) then 			ChSelectorMask(32*6+31 downto 32*6) <= u_dat_in; end if;
-			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart7) ) then 			ChSelectorMask(32*7+31 downto 32*7) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart0_0) ) then    ChSelectorMask(64*0+31 downto 64*0) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart0_1) ) then    ChSelectorMask(64*0+31+32 downto 64*0+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart1_0) ) then    ChSelectorMask(64*1+31 downto 64*1) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart1_1) ) then    ChSelectorMask(64*1+31+32 downto 64*1+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart2_0) ) then    ChSelectorMask(64*2+31 downto 64*2) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart2_1) ) then    ChSelectorMask(64*2+31+32 downto 64*2+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart3_0) ) then    ChSelectorMask(64*3+31 downto 64*3) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart3_1) ) then    ChSelectorMask(64*3+31+32 downto 64*3+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart4_0) ) then    ChSelectorMask(64*4+31 downto 64*4) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart4_1) ) then    ChSelectorMask(64*4+31+32 downto 64*4+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart5_0) ) then    ChSelectorMask(64*5+31 downto 64*5) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart5_1) ) then    ChSelectorMask(64*5+31+32 downto 64*5+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart6_0) ) then    ChSelectorMask(64*6+31 downto 64*6) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart6_1) ) then    ChSelectorMask(64*6+31+32 downto 64*6+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart7_0) ) then    ChSelectorMask(64*7+31 downto 64*7) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart7_1) ) then    ChSelectorMask(64*7+31+32 downto 64*7+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart8_0) ) then    ChSelectorMask(64*8+31 downto 64*8) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart8_1) ) then    ChSelectorMask(64*8+31+32 downto 64*8+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart9_0) ) then    ChSelectorMask(64*9+31 downto 64*9) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart9_1) ) then    ChSelectorMask(64*9+31+32 downto 64*9+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart10_0) ) then    ChSelectorMask(64*10+31 downto 64*10) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart10_1) ) then    ChSelectorMask(64*10+31+32 downto 64*10+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart11_0) ) then    ChSelectorMask(64*11+31 downto 64*11) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart11_1) ) then    ChSelectorMask(64*11+31+32 downto 64*11+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart12_0) ) then    ChSelectorMask(64*12+31 downto 64*12) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart12_1) ) then    ChSelectorMask(64*12+31+32 downto 64*12+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart13_0) ) then    ChSelectorMask(64*13+31 downto 64*13) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart13_1) ) then    ChSelectorMask(64*13+31+32 downto 64*13+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart14_0) ) then    ChSelectorMask(64*14+31 downto 64*14) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart14_1) ) then    ChSelectorMask(64*14+31+32 downto 64*14+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart15_0) ) then    ChSelectorMask(64*15+31 downto 64*15) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart15_1) ) then    ChSelectorMask(64*15+31+32 downto 64*15+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart16_0) ) then    ChSelectorMask(64*16+31 downto 64*16) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart16_1) ) then    ChSelectorMask(64*16+31+32 downto 64*16+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart17_0) ) then    ChSelectorMask(64*17+31 downto 64*17) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart17_1) ) then    ChSelectorMask(64*17+31+32 downto 64*17+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart18_0) ) then    ChSelectorMask(64*18+31 downto 64*18) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart18_1) ) then    ChSelectorMask(64*18+31+32 downto 64*18+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart19_0) ) then    ChSelectorMask(64*19+31 downto 64*19) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart19_1) ) then    ChSelectorMask(64*19+31+32 downto 64*19+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart20_0) ) then    ChSelectorMask(64*20+31 downto 64*20) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart20_1) ) then    ChSelectorMask(64*20+31+32 downto 64*20+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart21_0) ) then    ChSelectorMask(64*21+31 downto 64*21) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart21_1) ) then    ChSelectorMask(64*21+31+32 downto 64*21+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart22_0) ) then    ChSelectorMask(64*22+31 downto 64*22) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart22_1) ) then    ChSelectorMask(64*22+31+32 downto 64*22+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart23_0) ) then    ChSelectorMask(64*23+31 downto 64*23) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart23_1) ) then    ChSelectorMask(64*23+31+32 downto 64*23+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart24_0) ) then    ChSelectorMask(64*24+31 downto 64*24) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart24_1) ) then    ChSelectorMask(64*24+31+32 downto 64*24+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart25_0) ) then    ChSelectorMask(64*25+31 downto 64*25) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart25_1) ) then    ChSelectorMask(64*25+31+32 downto 64*25+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart26_0) ) then    ChSelectorMask(64*26+31 downto 64*26) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart26_1) ) then    ChSelectorMask(64*26+31+32 downto 64*26+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart27_0) ) then    ChSelectorMask(64*27+31 downto 64*27) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart27_1) ) then    ChSelectorMask(64*27+31+32 downto 64*27+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart28_0) ) then    ChSelectorMask(64*28+31 downto 64*28) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart28_1) ) then    ChSelectorMask(64*28+31+32 downto 64*28+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart29_0) ) then    ChSelectorMask(64*29+31 downto 64*29) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart29_1) ) then    ChSelectorMask(64*29+31+32 downto 64*29+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart30_0) ) then    ChSelectorMask(64*30+31 downto 64*30) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart30_1) ) then    ChSelectorMask(64*30+31+32 downto 64*30+32) <= u_dat_in; end if;
+   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart31_0) ) then    ChSelectorMask(64*31+31 downto 64*31) <= u_dat_in; end if;	   if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_ChSelectorPart31_1) ) then    ChSelectorMask(64*31+31+32 downto 64*31+32) <= u_dat_in; end if;
 			
 			--debug
 			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) = BASE_TRIG_SelectedDebugInput_1) ) then 	SelectedDebugInput(8*1-1 downto 8*0) <= u_dat_in(7 downto 0); end if;
@@ -789,14 +840,38 @@ begin
 			if (u_ad_reg(11 downto 4) = BASE_TRIG_NIMOUT_Mode) then 			u_data_o(0) <= NIMOUT_Mode; end if;
 			
 			--Ch Selector
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart0) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*0+31 downto 32*0); end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart1) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*1+31 downto 32*1); end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart2) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*2+31 downto 32*2); end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart3) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*3+31 downto 32*3); end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart4) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*4+31 downto 32*4); end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart5) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*5+31 downto 32*5); end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart6) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*6+31 downto 32*6); end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart7) then 			u_data_o(31 downto 0) <= ChSelectorMask(32*7+31 downto 32*7); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart0_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*0+31 downto 64*0); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart0_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*0+31+32 downto 64*0+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart1_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*1+31 downto 64*1); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart1_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*1+31+32 downto 64*1+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart2_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*2+31 downto 64*2); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart2_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*2+31+32 downto 64*2+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart3_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*3+31 downto 64*3); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart3_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*3+31+32 downto 64*3+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart4_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*4+31 downto 64*4); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart4_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*4+31+32 downto 64*4+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart5_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*5+31 downto 64*5); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart5_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*5+31+32 downto 64*5+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart6_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*6+31 downto 64*6); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart6_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*6+31+32 downto 64*6+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart7_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*7+31 downto 64*7); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart7_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*7+31+32 downto 64*7+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart8_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*8+31 downto 64*8); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart8_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*8+31+32 downto 64*8+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart9_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*9+31 downto 64*9); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart9_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*9+31+32 downto 64*9+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart10_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*10+31 downto 64*10); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart10_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*10+31+32 downto 64*10+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart11_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*11+31 downto 64*11); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart11_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*11+31+32 downto 64*11+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart12_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*12+31 downto 64*12); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart12_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*12+31+32 downto 64*12+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart13_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*13+31 downto 64*13); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart13_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*13+31+32 downto 64*13+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart14_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*14+31 downto 64*14); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart14_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*14+31+32 downto 64*14+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart15_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*15+31 downto 64*15); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart15_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*15+31+32 downto 64*15+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart16_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*16+31 downto 64*16); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart16_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*16+31+32 downto 64*16+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart17_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*17+31 downto 64*17); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart17_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*17+31+32 downto 64*17+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart18_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*18+31 downto 64*18); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart18_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*18+31+32 downto 64*18+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart19_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*19+31 downto 64*19); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart19_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*19+31+32 downto 64*19+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart20_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*20+31 downto 64*20); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart20_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*20+31+32 downto 64*20+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart21_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*21+31 downto 64*21); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart21_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*21+31+32 downto 64*21+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart22_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*22+31 downto 64*22); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart22_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*22+31+32 downto 64*22+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart23_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*23+31 downto 64*23); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart23_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*23+31+32 downto 64*23+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart24_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*24+31 downto 64*24); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart24_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*24+31+32 downto 64*24+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart25_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*25+31 downto 64*25); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart25_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*25+31+32 downto 64*25+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart26_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*26+31 downto 64*26); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart26_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*26+31+32 downto 64*26+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart27_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*27+31 downto 64*27); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart27_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*27+31+32 downto 64*27+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart28_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*28+31 downto 64*28); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart28_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*28+31+32 downto 64*28+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart29_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*29+31 downto 64*29); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart29_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*29+31+32 downto 64*29+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart30_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*30+31 downto 64*30); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart30_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*30+31+32 downto 64*30+32); end if;
+   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart31_0) then   u_data_o(31 downto 0) <= ChSelectorMask(64*31+31 downto 64*31); end if;	   if (u_ad_reg(11 downto 4) =  BASE_TRIG_ChSelectorPart31_1) then   u_data_o(31 downto 0) <= ChSelectorMask(64*31+31+32 downto 64*31+32); end if;
 
 			--debug
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_1) then 	u_data_o(7 downto 0) <= SelectedDebugInput(8*1-1 downto 8*0); end if;
